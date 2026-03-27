@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id         String    @id @default(cuid())
+  name       String
+  type       String
+  sector     String
+  country    String
+  created_at DateTime  @default(now())
+
+  projects Project[]
+  users    User[]
+
+  @@map("organizations")
+}
+
+model Project {
+  id              String       @id @default(cuid())
+  organization_id String
+  name            String
+  status          String       @default("active")
+  created_at      DateTime     @default(now())
+
+  organization  Organization   @relation(fields: [organization_id], references: [id])
+  bim_documents BimDocument[]
+
+  @@map("projects")
+}
+
+model User {
+  id              String   @id @default(cuid())
+  organization_id String
+  email           String   @unique
+  password_hash   String
+  role            Role     @default(adj)
+  created_at      DateTime @default(now())
+
+  organization      Organization  @relation(fields: [organization_id], references: [id])
+  created_documents BimDocument[] @relation("CreatedBy")
+  approved_documents BimDocument[] @relation("ApprovedBy")
+
+  @@map("users")
+}
+
+enum Role {
+  adjudicador
+  adj_principal
+  adj
+}
+
+model BimDocument {
+  id            String         @id @default(cuid())
+  project_id    String
+  document_type DocumentType
+  status        DocumentStatus @default(borrador)
+  version       Int            @default(1)
+  created_by    String
+  approved_by   String?
+  created_at    DateTime       @default(now())
+  updated_at    DateTime       @updatedAt
+
+  project               Project               @relation(fields: [project_id], references: [id])
+  creator               User                  @relation("CreatedBy", fields: [created_by], references: [id])
+  approver              User?                 @relation("ApprovedBy", fields: [approved_by], references: [id])
+  questionnaire_answers QuestionnaireAnswer[]
+  generated_files       GeneratedFile[]
+
+  @@map("bim_documents")
+}
+
+enum DocumentType {
+  OIR
+  AIR
+  EIR
+  BEP
+}
+
+enum DocumentStatus {
+  borrador
+  en_revision
+  aprobado
+}
+
+model QuestionnaireAnswer {
+  id          String      @id @default(cuid())
+  document_id String
+  question_id String
+  answer_value String
+  answer_type  AnswerType
+  created_at  DateTime    @default(now())
+
+  document BimDocument @relation(fields: [document_id], references: [id], onDelete: Cascade)
+
+  @@unique([document_id, question_id])
+  @@map("questionnaire_answers")
+}
+
+enum AnswerType {
+  text
+  textarea
+  select
+  multi_select
+  boolean
+}
+
+model GeneratedFile {
+  id           String   @id @default(cuid())
+  document_id  String
+  file_format  String
+  file_url     String
+  generated_at DateTime @default(now())
+
+  document BimDocument @relation(fields: [document_id], references: [id], onDelete: Cascade)
+
+  @@map("generated_files")
+}
