@@ -35,14 +35,11 @@ export async function enrichOirWithLLM(vars: OIRTemplateVars): Promise<OIREnrich
   const prompt = buildPrompt(vars);
 
   try {
-    const stream = client.messages.stream({
+    const response = await client.messages.create({
       model: 'claude-opus-4-6',
       max_tokens: 4096,
-      thinking: { type: 'adaptive' },
       messages: [{ role: 'user', content: prompt }],
     });
-
-    const response = await stream.finalMessage();
 
     const textBlock = response.content.find((b) => b.type === 'text');
     if (!textBlock || textBlock.type !== 'text') {
