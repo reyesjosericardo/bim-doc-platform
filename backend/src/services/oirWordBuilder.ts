@@ -51,7 +51,16 @@ function label(text: string): Paragraph {
 
 function multilineBody(text: string): Paragraph[] {
   if (!text || text === 'No aplica') return [body(text || 'No aplica', { italic: true })];
-  return text.split('\n').map((line) => body(line.trim()));
+  return text.split('\n').filter(Boolean).map((line) => {
+    // §Phase headers produced by formatBimUsesList
+    if (line.startsWith('§')) {
+      return new Paragraph({
+        children: [new TextRun({ text: line.slice(1), bold: true, size: 22, color: BRAND_COLOR })],
+        spacing: { before: 200, after: 40 },
+      });
+    }
+    return body(line.trim());
+  });
 }
 
 function divider(): Paragraph {
@@ -205,6 +214,13 @@ export async function buildOirDocx(vars: OIREnrichedVars): Promise<Buffer> {
 
           h2('3.1 Usos BIM requeridos'),
           ...multilineBody(vars.bim_uses_list),
+          new Paragraph({
+            children: [new TextRun({
+              text: 'Los usos BIM han sido definidos según el framework BIM Uses de la Universidad de Penn State (Computer Integrated Construction Research Program) y adaptados a los requisitos de información establecidos en ISO 19650-1.',
+              size: 18, italics: true, color: '6B7280',
+            })],
+            spacing: { before: 100, after: 80 },
+          }),
 
           h2('3.2 Objetivo estratégico principal'),
           body(vars.strategic_objective),
@@ -256,9 +272,9 @@ export async function buildOirDocx(vars: OIREnrichedVars): Promise<Buffer> {
           ...kv('¿Usa o planea usar un entorno común de datos?', vars.has_cde),
           ...(vars.has_cde === 'Sí' ? kv('Plataforma CDE', vars.cde_platform) : []),
 
-          h2('5.4 Nivel de información (LOD/LOI)'),
-          ...kv('¿Tiene definido LOD/LOI para sus activos?', vars.has_lod),
-          ...(vars.has_lod === 'Sí' ? kv('Nivel de información geométrica mínimo', vars.lod_level) : []),
+          h2('5.4 Nivel de información necesario (ISO 19650-1 §11.2)'),
+          ...kv('¿Tiene la organización definido un nivel de información necesario para sus activos?', vars.has_lod),
+          ...(vars.has_lod === 'Sí' ? kv('Nivel de información necesario mínimo requerido', vars.lod_level) : []),
           divider(),
 
           // ── SECCIÓN 6 — Gobernanza ────────────────────────────────────

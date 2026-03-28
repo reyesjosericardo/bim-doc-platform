@@ -7,8 +7,23 @@ import type { OIREnrichedVars } from './oirLLMEnricher';
 function nl2li(text: string): string {
   if (!text || text === 'No aplica') return '<em style="color:#6B7280">No aplica</em>';
   const lines = text.split('\n').filter(Boolean);
-  if (lines.length === 1) return `<span>${lines[0]}</span>`;
-  return `<ol>${lines.map((l) => `<li>${l.replace(/^\d+\.\s*/, '')}</li>`).join('')}</ol>`;
+  // Single non-header line
+  if (lines.length === 1 && !lines[0].startsWith('§')) return `<span>${lines[0]}</span>`;
+
+  // Build content — §Phase lines become bold headers, others become list items
+  let html = '';
+  let inList = false;
+  for (const line of lines) {
+    if (line.startsWith('§')) {
+      if (inList) { html += '</ol>'; inList = false; }
+      html += `<p style="font-weight:600;color:#1D4ED8;margin-top:12px;margin-bottom:4px">${line.slice(1)}</p>`;
+    } else {
+      if (!inList) { html += '<ol style="margin:4px 0 4px 24px">'; inList = true; }
+      html += `<li>${line.replace(/^\d+\.\s*/, '')}</li>`;
+    }
+  }
+  if (inList) html += '</ol>';
+  return html;
 }
 
 function row(label: string, value: string): string {
@@ -129,7 +144,14 @@ ${section('2', 'Identificación de la organización', `
 
 ${section('3', 'Objetivos estratégicos', `
   ${narrativeHtml(vars.narrative_objectives)}
-  ${subsection('3.1 Usos BIM requeridos', nl2li(vars.bim_uses_list))}
+  ${subsection('3.1 Usos BIM requeridos', `
+    ${nl2li(vars.bim_uses_list)}
+    <p style="font-size:9pt;color:#6B7280;font-style:italic;margin-top:10px;line-height:1.5">
+      Los usos BIM han sido definidos según el framework BIM Uses de la Universidad de Penn State
+      (Computer Integrated Construction Research Program) y adaptados a los requisitos de
+      información establecidos en ISO 19650-1.
+    </p>
+  `)}
   ${subsection('3.2 Objetivo estratégico principal', `<p>${vars.strategic_objective}</p>`)}
   ${subsection('3.3 Plan de gestión de activos', `
     ${kv('¿Dispone de plan de gestión de activos vigente?', vars.has_asset_plan)}
@@ -164,9 +186,9 @@ ${section('5', 'Estándares y formatos', `
     ${kv('¿Usa o planea usar un entorno común de datos?', vars.has_cde)}
     ${vars.has_cde === 'Sí' ? `<div class="conditional-block">${kv('Plataforma CDE', vars.cde_platform)}</div>` : ''}
   `)}
-  ${subsection('5.4 Nivel de información (LOD/LOI)', `
-    ${kv('¿Tiene definido LOD/LOI para sus activos?', vars.has_lod)}
-    ${vars.has_lod === 'Sí' ? `<div class="conditional-block">${kv('Nivel de información geométrica mínimo', vars.lod_level)}</div>` : ''}
+  ${subsection('5.4 Nivel de información necesario (ISO 19650-1 §11.2)', `
+    ${kv('¿Tiene la organización definido un nivel de información necesario para sus activos?', vars.has_lod)}
+    ${vars.has_lod === 'Sí' ? `<div class="conditional-block">${kv('Nivel de información necesario mínimo requerido', vars.lod_level)}</div>` : ''}
   `)}
 `)}
 

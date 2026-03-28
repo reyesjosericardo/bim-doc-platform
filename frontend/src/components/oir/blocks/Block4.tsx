@@ -3,6 +3,8 @@
 import { SelectField, MultiSelectField, BooleanField } from '../FormField';
 import type { AnswersMap } from '@/types/oir';
 
+interface NivelOption { value: string; label: string; description: string }
+
 interface Props {
   answers: AnswersMap;
   onChange: (id: string, value: string) => void;
@@ -42,12 +44,12 @@ const PLATAFORMA_CDE_OPTIONS = [
   { value: 'Otra', label: 'Otra' },
 ];
 
-const LOD_OPTIONS = [
-  { value: 'LOG 1 conceptual', label: 'LOG 1 — Conceptual' },
-  { value: 'LOG 2 esquemático', label: 'LOG 2 — Esquemático' },
-  { value: 'LOG 3 definido', label: 'LOG 3 — Definido' },
-  { value: 'LOG 4 detallado', label: 'LOG 4 — Detallado' },
-  { value: 'LOG 5 construido', label: 'LOG 5 — Construido (As-built)' },
+const NIVEL_INFO_OPTIONS: NivelOption[] = [
+  { value: 'nivel_1', label: 'Nivel 1 — Representación conceptual',   description: 'Masa, volumen aproximado, ubicación genérica' },
+  { value: 'nivel_2', label: 'Nivel 2 — Representación genérica',     description: 'Geometría esquemática, sistemas definidos, clasificación básica' },
+  { value: 'nivel_3', label: 'Nivel 3 — Representación específica',   description: 'Geometría definida, especificaciones técnicas, datos de producto' },
+  { value: 'nivel_4', label: 'Nivel 4 — Representación detallada',    description: 'Geometría de fabricación y ensamblaje, datos completos de instalación' },
+  { value: 'nivel_5', label: 'Nivel 5 — Representación construida (as-built)', description: 'Condición real verificada del activo, datos operativos completos' },
 ];
 
 export function Block4({ answers, onChange }: Props) {
@@ -102,7 +104,7 @@ export function Block4({ answers, onChange }: Props) {
 
       <BooleanField
         id="OIR-4.5"
-        label="OIR-4.5 ¿Tiene definido LOD/LOI para sus activos?"
+        label="OIR-4.5 ¿Tiene la organización definido un nivel de información necesario para sus activos según ISO 19650-1 §11.2?"
         required
         answers={answers}
         onChange={onChange}
@@ -110,13 +112,30 @@ export function Block4({ answers, onChange }: Props) {
 
       {tieneLOD && (
         <div className="pl-4 border-l-2 border-brand-200 bg-brand-50 rounded-r-lg p-4">
-          <SelectField
-            id="OIR-4.6"
-            label="OIR-4.6 Nivel de información geométrica mínimo"
-            options={LOD_OPTIONS}
-            answers={answers}
-            onChange={onChange}
-          />
+          <label className="label">
+            OIR-4.6 ¿Qué nivel de información necesario (geométrico y alfanumérico) requiere la organización como mínimo?
+          </label>
+          <div className="space-y-2 mt-2">
+            {NIVEL_INFO_OPTIONS.map((opt) => (
+              <label
+                key={opt.value}
+                className="flex items-start gap-3 cursor-pointer group p-2 rounded hover:bg-blue-50"
+              >
+                <input
+                  type="radio"
+                  name="OIR-4.6"
+                  value={opt.value}
+                  checked={answers['OIR-4.6'] === opt.value}
+                  onChange={() => onChange('OIR-4.6', opt.value)}
+                  className="h-4 w-4 mt-0.5 border-gray-300 text-brand-600 focus:ring-brand-500"
+                />
+                <div>
+                  <span className="text-sm font-medium text-gray-700">{opt.label}</span>
+                  <p className="text-xs text-gray-500 mt-0.5">{opt.description}</p>
+                </div>
+              </label>
+            ))}
+          </div>
         </div>
       )}
     </div>

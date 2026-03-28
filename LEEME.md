@@ -1,4 +1,4 @@
-# BIM Doc Platform — Sprint 1 + Sprint 2
+# BIM Doc Platform — Sprint 1 + Sprint 2 + Sprint 3 + Sprint 3.1
 
 Plataforma web para gestión de documentos BIM según ISO 19650.
 
@@ -190,7 +190,13 @@ adj           → rellena formularios, visualiza
 - Los tests unitarios cubren: mapper, Word builder, HTML builder (no mocks de DB)
 - Autosave se dispara por bloque, no por campo individual
 
-## Sprint 3 (pendiente)
+## Documentos implementados
+
+- [x] Sprint 1 + 2: OIR (Requisitos de Información de la Organización) — Word + PDF, 27 preguntas, 5 bloques
+- [x] Sprint 3: LLM enrichment — narrativas técnicas por sección vía Anthropic Claude (oirLLMEnricher.ts)
+- [x] Sprint 3.1: Mejoras de calidad — prompt LLM ejecutivo con terminología ISO 19650, corrección niveles de información necesario (ISO 19650-1 §11.2), BIM Uses Penn State (25 usos agrupados por fase)
+
+## Sprint 4 (pendiente)
 - Módulo AIR (Asset Information Requirements)
 - Notificaciones por email al cambiar estado
 - Historial de versiones del documento

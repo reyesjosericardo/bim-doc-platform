@@ -1,6 +1,6 @@
 /**
  * Maps questionnaire_answers rows to template variables for OIR document generation.
- * Multi-select values are stored pipe-separated: "ISO 19650|BIM Level 2"
+ * Multi-select values are stored pipe-separated: "BU-01|BU-08|BU-23"
  */
 
 export interface OIRTemplateVars {
@@ -48,6 +48,54 @@ export interface OIRTemplateVars {
 
 type AnswerRow = { question_id: string; answer_value: string };
 
+// ─── BIM Uses catalog (Penn State BIM Uses framework) ─────────────────────────
+
+const BIM_USES_CATALOG: Record<string, { es: string; en: string; fase: string }> = {
+  'BU-01': { es: 'Modelado de condiciones existentes',           en: 'Existing Conditions Modeling',    fase: 'Planificación' },
+  'BU-02': { es: 'Estimación de costos',                         en: 'Cost Estimation',                 fase: 'Planificación' },
+  'BU-03': { es: 'Planificación de fases — modelado 4D',         en: 'Phase Planning (4D Modeling)',    fase: 'Planificación' },
+  'BU-04': { es: 'Programación de usos del espacio',             en: 'Programming',                     fase: 'Planificación' },
+  'BU-05': { es: 'Análisis de sitio',                            en: 'Site Analysis',                   fase: 'Planificación' },
+  'BU-06': { es: 'Autoría del diseño',                           en: 'Design Authoring',                fase: 'Diseño' },
+  'BU-07': { es: 'Revisiones de diseño',                         en: 'Design Reviews',                  fase: 'Diseño' },
+  'BU-08': { es: 'Coordinación 3D — detección de interferencias', en: '3D Coordination',               fase: 'Diseño' },
+  'BU-09': { es: 'Análisis estructural',                         en: 'Structural Analysis',             fase: 'Diseño' },
+  'BU-10': { es: 'Análisis de iluminación',                      en: 'Lighting Analysis',               fase: 'Diseño' },
+  'BU-11': { es: 'Análisis energético',                          en: 'Energy Analysis',                 fase: 'Diseño' },
+  'BU-12': { es: 'Análisis de sistemas mecánicos',               en: 'Mechanical Analysis',             fase: 'Diseño' },
+  'BU-13': { es: 'Otros análisis de ingeniería',                 en: 'Other Engineering Analysis',      fase: 'Diseño' },
+  'BU-14': { es: 'Evaluación de sostenibilidad',                 en: 'Sustainability Evaluation',       fase: 'Diseño' },
+  'BU-15': { es: 'Validación normativa y regulatoria',           en: 'Code Validation',                 fase: 'Diseño' },
+  'BU-16': { es: 'Planificación de uso del sitio en obra',       en: 'Site Utilization Planning',       fase: 'Construcción' },
+  'BU-17': { es: 'Diseño de sistemas constructivos',             en: 'Construction System Design',      fase: 'Construcción' },
+  'BU-18': { es: 'Fabricación digital',                          en: 'Digital Fabrication',             fase: 'Construcción' },
+  'BU-19': { es: 'Control y planificación 3D en obra',           en: '3D Control and Planning',         fase: 'Construcción' },
+  'BU-20': { es: 'Modelado as-built — condición construida',     en: 'Record Modeling (As-Built)',      fase: 'Operación' },
+  'BU-21': { es: 'Programación de mantenimiento preventivo',     en: 'Maintenance Scheduling',          fase: 'Operación' },
+  'BU-22': { es: 'Análisis de sistemas del edificio',            en: 'Building System Analysis',        fase: 'Operación' },
+  'BU-23': { es: 'Gestión de activos',                           en: 'Asset Management',                fase: 'Operación' },
+  'BU-24': { es: 'Gestión y seguimiento de espacios',            en: 'Space Management and Tracking',   fase: 'Operación' },
+  'BU-25': { es: 'Planificación ante emergencias y desastres',   en: 'Disaster Planning',               fase: 'Operación' },
+};
+
+// ─── Nivel de información necesario (ISO 19650-1 §11.2) ───────────────────────
+
+const LOD_LEVELS: Record<string, string> = {
+  'nivel_1': 'Nivel 1 — Representación conceptual',
+  'nivel_2': 'Nivel 2 — Representación genérica',
+  'nivel_3': 'Nivel 3 — Representación específica',
+  'nivel_4': 'Nivel 4 — Representación detallada',
+  'nivel_5': 'Nivel 5 — Representación construida (as-built)',
+  // backward compatibility — legacy LOG values
+  'LOG 1 conceptual':  'Nivel 1 — Representación conceptual',
+  'LOG 2 esquemático': 'Nivel 2 — Representación genérica',
+  'LOG 3 definido':    'Nivel 3 — Representación específica',
+  'LOG 4 detallado':   'Nivel 4 — Representación detallada',
+  'LOG 5 construido':  'Nivel 5 — Representación construida (as-built)',
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
 function parseMulti(value: string | undefined): string[] {
   if (!value) return [];
   // Support both pipe-separated (our storage) and JSON array (legacy)
@@ -61,6 +109,41 @@ function formatList(value: string | undefined): string {
   const items = parseMulti(value);
   if (items.length === 0) return 'No aplica';
   return items.map((item, i) => `${i + 1}. ${item}`).join('\n');
+}
+
+/**
+ * Formats BIM uses grouped by phase with §Phase headers for document rendering.
+ * Values are expected to be BU-codes (BU-01 … BU-25).
+ * Legacy plain-text values fall into an "Otros" group.
+ */
+function formatBimUsesList(value: string | undefined): string {
+  const codes = parseMulti(value);
+  if (codes.length === 0) return 'No aplica';
+
+  const phaseOrder = ['Planificación', 'Diseño', 'Construcción', 'Operación'];
+  const grouped: Record<string, string[]> = {};
+
+  for (const code of codes) {
+    const info = BIM_USES_CATALOG[code];
+    if (info) {
+      if (!grouped[info.fase]) grouped[info.fase] = [];
+      grouped[info.fase].push(`[${code}] ${info.en} — ${info.es}`);
+    } else {
+      // Legacy plain-text value
+      if (!grouped['Otros']) grouped['Otros'] = [];
+      grouped['Otros'].push(code);
+    }
+  }
+
+  const lines: string[] = [];
+  for (const fase of [...phaseOrder, 'Otros']) {
+    if (grouped[fase]?.length) {
+      lines.push(`§${fase}`);
+      grouped[fase].forEach((item, i) => lines.push(`${i + 1}. ${item}`));
+    }
+  }
+
+  return lines.join('\n');
 }
 
 function boolText(value: string | undefined): string {
@@ -77,6 +160,12 @@ function conditional(condition: string | undefined, value: string | undefined, f
 function conditionalList(condition: string | undefined, value: string | undefined): string {
   if (condition !== 'Sí') return 'No aplica';
   return formatList(value);
+}
+
+function resolveLodLevel(hasLod: string | undefined, value: string | undefined): string {
+  if (hasLod !== 'Sí') return 'No aplica';
+  if (!value) return 'No aplica';
+  return LOD_LEVELS[value] || value;
 }
 
 export function mapAnswersToVars(
@@ -112,7 +201,7 @@ export function mapAnswersToVars(
     standards_list:    formatList(m['OIR-1.5']),
     responsible_name:  m['OIR-1.6'] || 'No aplica',
     // Block 2
-    bim_uses_list:         formatList(m['OIR-2.1']),
+    bim_uses_list:         formatBimUsesList(m['OIR-2.1']),
     strategic_objective:   m['OIR-2.2'] || 'No aplica',
     has_asset_plan:        boolText(m['OIR-2.3']),
     asset_plan_standard:   conditional(m['OIR-2.3'], m['OIR-2.4']),
@@ -132,7 +221,7 @@ export function mapAnswersToVars(
     has_cde:               m['OIR-4.3'] || 'No aplica',
     cde_platform:          conditional(m['OIR-4.3'], m['OIR-4.4']),
     has_lod:               boolText(m['OIR-4.5']),
-    lod_level:             conditional(m['OIR-4.5'], m['OIR-4.6']),
+    lod_level:             resolveLodLevel(m['OIR-4.5'], m['OIR-4.6']),
     // Block 5
     update_frequency:    m['OIR-5.1'] || 'No aplica',
     has_security:        boolText(m['OIR-5.2']),
