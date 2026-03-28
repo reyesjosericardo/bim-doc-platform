@@ -34,22 +34,28 @@ export async function enrichOirWithLLM(vars: OIRTemplateVars): Promise<OIREnrich
 
   const prompt = buildPrompt(vars);
 
+  console.log('[LLM] Calling Anthropic API...');
   try {
     const response = await client.messages.create({
-      model: 'claude-opus-4-6',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }],
     });
+
+    console.log('[LLM] Response received, stop_reason:', response.stop_reason);
 
     const textBlock = response.content.find((b) => b.type === 'text');
     if (!textBlock || textBlock.type !== 'text') {
       throw new Error('No text block in response');
     }
 
+    console.log('[LLM] Text block length:', textBlock.text.length);
     const narratives = parseNarratives(textBlock.text);
+    console.log('[LLM] Narratives parsed successfully');
     return { ...vars, ...narratives };
-  } catch (err) {
-    console.error('[LLM] Enrichment failed:', err);
+  } catch (err: any) {
+    console.error('[LLM] Enrichment failed:', err?.message || err);
+    console.error('[LLM] Error details:', JSON.stringify(err, null, 2));
     return { ...vars, ...emptyNarratives() };
   }
 }
