@@ -232,8 +232,11 @@ router.get('/projects/:projectId/oir', requireAuth, async (req: AuthRequest, res
 });
 
 // POST /api/documents/oir/:id/generate — generate Word + PDF
+// Body: { mode?: 'complete' | 'narrative_only' }
 router.post('/oir/:id/generate', requireAuth, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
+  const mode: 'complete' | 'narrative_only' =
+    req.body?.mode === 'narrative_only' ? 'narrative_only' : 'complete';
 
   try {
     const document = await prisma.bimDocument.findUnique({
@@ -244,10 +247,11 @@ router.post('/oir/:id/generate', requireAuth, async (req: AuthRequest, res: Resp
       return res.status(404).json({ error: 'OIR document not found' });
     }
 
-    const files = await generateOirDocuments(id);
+    const files = await generateOirDocuments(id, mode);
 
     return res.json({
       message: 'Documents generated successfully',
+      mode,
       docxUrl: files.docxUrl,
       pdfUrl:  files.pdfUrl,
     });
@@ -257,12 +261,12 @@ router.post('/oir/:id/generate', requireAuth, async (req: AuthRequest, res: Resp
   }
 });
 
-// GET /api/documents/oir/:id/download/:format — download docx or pdf
+// GET /api/documents/oir/:id/download/:format — download docx, pdf, docx_exec, or pdf_exec
 router.get('/oir/:id/download/:format', requireAuth, async (req: AuthRequest, res: Response) => {
   const { id, format } = req.params;
 
-  if (!['docx', 'pdf'].includes(format)) {
-    return res.status(400).json({ error: 'Format must be docx or pdf' });
+  if (!['docx', 'pdf', 'docx_exec', 'pdf_exec'].includes(format)) {
+    return res.status(400).json({ error: 'Format must be docx, pdf, docx_exec, or pdf_exec' });
   }
 
   try {
@@ -274,7 +278,11 @@ router.get('/oir/:id/download/:format', requireAuth, async (req: AuthRequest, re
       return res.status(404).json({ error: 'OIR document not found' });
     }
 
-    const filePath = getGeneratedFilePath(id, document.version, format as 'docx' | 'pdf');
+    const filePath = getGeneratedFilePath(
+      id,
+      document.version,
+      format as 'docx' | 'pdf' | 'docx_exec' | 'pdf_exec',
+    );
 
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({
@@ -283,12 +291,15 @@ router.get('/oir/:id/download/:format', requireAuth, async (req: AuthRequest, re
     }
 
     const mimeTypes: Record<string, string> = {
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      pdf:  'application/pdf',
+      docx:      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      pdf:       'application/pdf',
+      docx_exec: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      pdf_exec:  'application/pdf',
     };
 
-    const orgName = 'OIR';
-    const filename = `${orgName}_v${document.version}.${format}`;
+    const ext      = format.startsWith('docx') ? 'docx' : 'pdf';
+    const suffix   = format.endsWith('_exec') ? '_ejecutivo' : '';
+    const filename = `OIR_v${document.version}${suffix}.${ext}`;
 
     res.setHeader('Content-Type', mimeTypes[format]);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

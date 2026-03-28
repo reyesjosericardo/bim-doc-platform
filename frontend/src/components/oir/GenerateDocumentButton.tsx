@@ -9,27 +9,49 @@ interface Props {
   answeredCount: number;
 }
 
+type DocMode = 'complete' | 'narrative_only';
+
 interface GeneratedLinks {
   docxUrl: string;
   pdfUrl:  string;
 }
 
+const DOWNLOAD_ICON = (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+  </svg>
+);
+
+const DOC_ICON = (
+  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+  </svg>
+);
+
+const CHECK_ICON = (
+  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+  </svg>
+);
+
 export function GenerateDocumentButton({ documentId, status, answeredCount }: Props) {
-  const [generating, setGenerating]   = useState(false);
-  const [links, setLinks]             = useState<GeneratedLinks | null>(null);
-  const [error, setError]             = useState('');
+  const [generating, setGenerating] = useState<DocMode | null>(null);
+  const [completeLinks, setCompleteLinks] = useState<GeneratedLinks | null>(null);
+  const [execLinks, setExecLinks]         = useState<GeneratedLinks | null>(null);
+  const [error, setError] = useState('');
 
   const isReady = status === 'aprobado' && answeredCount >= 20;
 
-  async function handleGenerate() {
-    setGenerating(true);
+  async function handleGenerate(mode: DocMode) {
+    setGenerating(mode);
     setError('');
-    setLinks(null);
 
     try {
       const res = await fetch(`/api/documents/oir/${documentId}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode }),
       });
 
       if (!res.ok) {
@@ -37,15 +59,23 @@ export function GenerateDocumentButton({ documentId, status, answeredCount }: Pr
         throw new Error(body.error || 'Error al generar el documento');
       }
 
-      const data = await res.json();
-      setLinks({
-        docxUrl: `/api/documents/oir/${documentId}/download/docx`,
-        pdfUrl:  `/api/documents/oir/${documentId}/download/pdf`,
-      });
+      const downloadDocx = mode === 'narrative_only'
+        ? `/api/documents/oir/${documentId}/download/docx_exec`
+        : `/api/documents/oir/${documentId}/download/docx`;
+      const downloadPdf = mode === 'narrative_only'
+        ? `/api/documents/oir/${documentId}/download/pdf_exec`
+        : `/api/documents/oir/${documentId}/download/pdf`;
+
+      const links: GeneratedLinks = { docxUrl: downloadDocx, pdfUrl: downloadPdf };
+      if (mode === 'complete') {
+        setCompleteLinks(links);
+      } else {
+        setExecLinks(links);
+      }
     } catch (e: any) {
       setError(e.message ?? 'Error inesperado');
     } finally {
-      setGenerating(false);
+      setGenerating(null);
     }
   }
 
@@ -61,66 +91,94 @@ export function GenerateDocumentButton({ documentId, status, answeredCount }: Pr
   }
 
   return (
-    <div className="space-y-3">
-      {!links ? (
-        <button
-          onClick={handleGenerate}
-          disabled={generating}
-          className="btn-primary w-full flex items-center justify-center gap-2"
-        >
-          {generating ? (
-            <>
-              <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Generando Word y PDF...
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
-              Generar documento OIR
-            </>
-          )}
-        </button>
-      ) : (
-        <div className="rounded-lg bg-green-50 border border-green-200 p-4">
-          <p className="text-sm font-medium text-green-800 mb-3 flex items-center gap-2">
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-            </svg>
-            Documento generado correctamente
+    <div className="space-y-4">
+      {/* ── Documento completo ──────────────────────────────────────── */}
+      <div className="rounded-lg border border-gray-200 p-4 space-y-3">
+        <div>
+          <p className="text-sm font-semibold text-gray-900">Documento completo</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Todas las secciones con narrativas LLM + datos estructurados + control de documento.
           </p>
-          <div className="flex gap-2 flex-wrap">
-            <a
-              href={links.docxUrl}
-              download
-              className="btn-primary text-sm py-2 flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Descargar Word (.docx)
-            </a>
-            <a
-              href={links.pdfUrl}
-              download
-              className="btn-secondary text-sm py-2 flex items-center gap-2"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-              </svg>
-              Descargar PDF
-            </a>
-            <button
-              onClick={() => setLinks(null)}
-              className="btn-secondary text-sm py-2"
-            >
-              Regenerar
-            </button>
-          </div>
         </div>
-      )}
+
+        {!completeLinks ? (
+          <button
+            onClick={() => handleGenerate('complete')}
+            disabled={generating !== null}
+            className="btn-primary w-full flex items-center justify-center gap-2 text-sm"
+          >
+            {generating === 'complete' ? (
+              <>
+                <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Generando...
+              </>
+            ) : (
+              <>{DOC_ICON} Generar documento completo</>
+            )}
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-green-700 flex items-center gap-1.5">
+              {CHECK_ICON} Documento completo generado
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <a href={completeLinks.docxUrl} download className="btn-primary text-xs py-1.5 flex items-center gap-1.5">
+                {DOWNLOAD_ICON} Word (.docx)
+              </a>
+              <a href={completeLinks.pdfUrl} download className="btn-secondary text-xs py-1.5 flex items-center gap-1.5">
+                {DOWNLOAD_ICON} PDF
+              </a>
+              <button onClick={() => setCompleteLinks(null)} className="btn-secondary text-xs py-1.5">
+                Regenerar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Versión ejecutiva ────────────────────────────────────────── */}
+      <div className="rounded-lg border border-blue-100 bg-blue-50/40 p-4 space-y-3">
+        <div>
+          <p className="text-sm font-semibold text-gray-900">Versión ejecutiva</p>
+          <p className="text-xs text-gray-500 mt-0.5">
+            Solo narrativas ISO 19650 por sub-sección, sin datos estructurados. Ideal para presentaciones a directivos.
+          </p>
+        </div>
+
+        {!execLinks ? (
+          <button
+            onClick={() => handleGenerate('narrative_only')}
+            disabled={generating !== null}
+            className="btn-secondary w-full flex items-center justify-center gap-2 text-sm"
+          >
+            {generating === 'narrative_only' ? (
+              <>
+                <span className="inline-block w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                Generando...
+              </>
+            ) : (
+              <>{DOC_ICON} Generar versión ejecutiva</>
+            )}
+          </button>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-green-700 flex items-center gap-1.5">
+              {CHECK_ICON} Versión ejecutiva generada
+            </p>
+            <div className="flex gap-2 flex-wrap">
+              <a href={execLinks.docxUrl} download className="btn-primary text-xs py-1.5 flex items-center gap-1.5">
+                {DOWNLOAD_ICON} Word ejecutivo
+              </a>
+              <a href={execLinks.pdfUrl} download className="btn-secondary text-xs py-1.5 flex items-center gap-1.5">
+                {DOWNLOAD_ICON} PDF ejecutivo
+              </a>
+              <button onClick={() => setExecLinks(null)} className="btn-secondary text-xs py-1.5">
+                Regenerar
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {error && (
         <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">

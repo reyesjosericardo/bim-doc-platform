@@ -195,6 +195,7 @@ adj           → rellena formularios, visualiza
 - [x] Sprint 1 + 2: OIR (Requisitos de Información de la Organización) — Word + PDF, 27 preguntas, 5 bloques
 - [x] Sprint 3: LLM enrichment — narrativas técnicas por sección vía Anthropic Claude (oirLLMEnricher.ts)
 - [x] Sprint 3.1: Mejoras de calidad — prompt LLM ejecutivo con terminología ISO 19650, corrección niveles de información necesario (ISO 19650-1 §11.2), BIM Uses Penn State (25 usos agrupados por fase)
+- [x] Sprint 3.2: Formato Markdown estructurado por sub-sección (22 narrativas LLM), modo narrative_only (versión ejecutiva), eliminación de fondos azules, Heading 2/3 en Word, blockquote para texto del usuario
 
 ## Sprint 4 (pendiente)
 - Módulo AIR (Asset Information Requirements)

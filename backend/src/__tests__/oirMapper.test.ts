@@ -52,7 +52,7 @@ describe('oirMapper — mapAnswersToVars', () => {
     expect(vars.has_cde).toBe('Sí');
     expect(vars.cde_platform).toBe('ACC');
     expect(vars.has_lod).toBe('Sí');
-    expect(vars.lod_level).toBe('LOG 3 definido');
+    expect(vars.lod_level).toBe('Nivel 3 — Representación específica');
     expect(vars.update_frequency).toBe('Trimestral');
     expect(vars.retention_policy).toBe('10 años');
     expect(vars.has_security).toBe('No');
@@ -69,8 +69,9 @@ describe('oirMapper — mapAnswersToVars', () => {
     expect(vars.standards_list).toContain('2. BIM Level 2');
     expect(vars.standards_list).toContain('3. Estándar propio');
 
-    expect(vars.bim_uses_list).toContain('1. Gestión de activos');
-    expect(vars.bim_uses_list).toContain('2. Gestión energética');
+    // Legacy values (not BU-codes) go into §Otros group
+    expect(vars.bim_uses_list).toContain('Gestión de activos');
+    expect(vars.bim_uses_list).toContain('Gestión energética');
 
     expect(vars.exchange_formats_list).toContain('1. IFC');
     expect(vars.exchange_formats_list).toContain('2. COBie');
@@ -167,11 +168,13 @@ describe('oirMapper — mapAnswersToVars', () => {
 });
 
 const EMPTY_NARRATIVES = {
-  narrative_identification: '',
-  narrative_objectives: '',
-  narrative_assets: '',
-  narrative_standards: '',
-  narrative_governance: '',
+  intro_context: '',
+  s2_1_perfil: '', s2_2_estandares: '', s2_3_responsable: '',
+  s3_1_usos_bim: '', s3_2_objetivo: '', s3_3_plan_activos: '', s3_4_regulatorio: '',
+  s4_1_registro: '', s4_2_om: '', s4_3_riesgos: '', s4_4_impactos: '', s4_5_eol: '',
+  s5_1_formatos: '', s5_2_clasificacion: '', s5_3_cde: '', s5_4_nivel_info: '',
+  s6_1_frecuencia: '', s6_2_seguridad: '', s6_3_retencion: '',
+  s7_observaciones: '',
 };
 
 describe('oirMapper — generación Word (.docx)', () => {
@@ -197,7 +200,7 @@ describe('oirMapper — generación Word (.docx)', () => {
 describe('oirMapper — generación HTML para PDF', () => {
   test('13. buildOirHtml devuelve HTML válido con todas las secciones', () => {
     const { buildOirHtml } = require('../services/oirHtmlBuilder');
-    const vars = mapAnswersToVars(FULL_ANSWERS, META);
+    const vars = { ...mapAnswersToVars(FULL_ANSWERS, META), ...EMPTY_NARRATIVES };
     const html = buildOirHtml(vars);
 
     expect(html).toContain('<!DOCTYPE html>');
@@ -214,7 +217,7 @@ describe('oirMapper — generación HTML para PDF', () => {
 
   test('14. HTML no contiene marcadores sin reemplazar cuando datos están vacíos', () => {
     const { buildOirHtml } = require('../services/oirHtmlBuilder');
-    const vars = mapAnswersToVars([], META);
+    const vars = { ...mapAnswersToVars([], META), ...EMPTY_NARRATIVES };
     const html = buildOirHtml(vars);
 
     // No debe haber marcadores {variable} sin sustituir

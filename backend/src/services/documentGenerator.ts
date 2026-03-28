@@ -1,6 +1,7 @@
 /**
- * Sprint 2 — Document generation service.
- * Orchestrates: DB read → variable mapping → Word build → PDF render → DB write.
+ * Sprint 3.2 — Document generation service.
+ * Orchestrates: DB read → variable mapping → LLM enrichment → Word build → PDF render → DB write.
+ * Supports 'complete' (full document) and 'narrative_only' (executive version) modes.
  */
 
 import path from 'path';
@@ -15,14 +16,19 @@ const prisma = new PrismaClient();
 
 const STORAGE_DIR = path.resolve(__dirname, '../../storage/generated');
 
+export type GenerateMode = 'complete' | 'narrative_only';
+
 export interface GeneratedFiles {
-  docxUrl: string;
-  pdfUrl:  string;
+  docxUrl:  string;
+  pdfUrl:   string;
   docxPath: string;
   pdfPath:  string;
 }
 
-export async function generateOirDocuments(documentId: string): Promise<GeneratedFiles> {
+export async function generateOirDocuments(
+  documentId: string,
+  mode: GenerateMode = 'complete',
+): Promise<GeneratedFiles> {
   // 1. Load document + answers + project info
   const doc = await prisma.bimDocument.findUniqueOrThrow({
     where: { id: documentId },
@@ -39,67 +45,72 @@ export async function generateOirDocuments(documentId: string): Promise<Generate
     status: doc.status,
   });
 
-  // 2b. Enrich with LLM-generated professional narratives (Sprint 3)
+  // 3. Enrich with LLM-generated narratives
   const vars = await enrichOirWithLLM(baseVars);
 
-  // 3. Ensure storage directory exists
+  // 4. Ensure storage directory exists
   await fs.mkdir(STORAGE_DIR, { recursive: true });
 
-  const baseName = `${documentId}_OIR_v${doc.version}`;
+  const suffix   = mode === 'narrative_only' ? '_exec' : '';
+  const baseName = `${documentId}_OIR_v${doc.version}${suffix}`;
   const docxPath = path.join(STORAGE_DIR, `${baseName}.docx`);
   const pdfPath  = path.join(STORAGE_DIR, `${baseName}.pdf`);
 
-  // 4. Generate Word document
-  const docxBuffer = await buildOirDocx(vars);
+  // 5. Generate Word document
+  const docxBuffer = await buildOirDocx(vars, mode);
   await fs.writeFile(docxPath, docxBuffer);
 
-  // 5. Generate PDF via Puppeteer
-  const html = buildOirHtml(vars);
+  // 6. Generate PDF via Puppeteer
+  const html = buildOirHtml(vars, mode);
   await renderHtmlToPdf(html, pdfPath);
 
-  // 6. Register files in DB (upsert by format)
-  const baseUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+  // 7. Register files in DB
+  const baseUrl     = process.env.BACKEND_URL || 'http://localhost:4000';
+  const formatDocx  = mode === 'narrative_only' ? 'docx_exec' : 'docx';
+  const formatPdf   = mode === 'narrative_only' ? 'pdf_exec'  : 'pdf';
 
   await prisma.$transaction([
     prisma.generatedFile.upsert({
-      where: {
-        // Use a synthetic unique check via raw upsert on document_id+file_format
-        id: `${documentId}-docx`,
-      },
-      update: { file_url: `${baseUrl}/api/documents/oir/${documentId}/download/docx`, generated_at: new Date() },
+      where:  { id: `${documentId}-${formatDocx}` },
+      update: { file_url: `${baseUrl}/api/documents/oir/${documentId}/download/${formatDocx}`, generated_at: new Date() },
       create: {
-        id: `${documentId}-docx`,
+        id: `${documentId}-${formatDocx}`,
         document_id: documentId,
-        file_format: 'docx',
-        file_url: `${baseUrl}/api/documents/oir/${documentId}/download/docx`,
+        file_format: formatDocx,
+        file_url: `${baseUrl}/api/documents/oir/${documentId}/download/${formatDocx}`,
       },
     }),
     prisma.generatedFile.upsert({
-      where: { id: `${documentId}-pdf` },
-      update: { file_url: `${baseUrl}/api/documents/oir/${documentId}/download/pdf`, generated_at: new Date() },
+      where:  { id: `${documentId}-${formatPdf}` },
+      update: { file_url: `${baseUrl}/api/documents/oir/${documentId}/download/${formatPdf}`, generated_at: new Date() },
       create: {
-        id: `${documentId}-pdf`,
+        id: `${documentId}-${formatPdf}`,
         document_id: documentId,
-        file_format: 'pdf',
-        file_url: `${baseUrl}/api/documents/oir/${documentId}/download/pdf`,
+        file_format: formatPdf,
+        file_url: `${baseUrl}/api/documents/oir/${documentId}/download/${formatPdf}`,
       },
     }),
   ]);
 
   return {
-    docxUrl:  `${baseUrl}/api/documents/oir/${documentId}/download/docx`,
-    pdfUrl:   `${baseUrl}/api/documents/oir/${documentId}/download/pdf`,
+    docxUrl:  `${baseUrl}/api/documents/oir/${documentId}/download/${formatDocx}`,
+    pdfUrl:   `${baseUrl}/api/documents/oir/${documentId}/download/${formatPdf}`,
     docxPath,
     pdfPath,
   };
 }
 
-export function getGeneratedFilePath(documentId: string, version: number, format: 'docx' | 'pdf'): string {
-  return path.join(STORAGE_DIR, `${documentId}_OIR_v${version}.${format}`);
+export function getGeneratedFilePath(
+  documentId: string,
+  version: number,
+  format: 'docx' | 'pdf' | 'docx_exec' | 'pdf_exec',
+): string {
+  const suffix = format.endsWith('_exec') ? '_exec' : '';
+  const ext    = format.replace('_exec', '');
+  return path.join(STORAGE_DIR, `${documentId}_OIR_v${version}${suffix}.${ext}`);
 }
 
 async function renderHtmlToPdf(html: string, outputPath: string): Promise<void> {
-  // Dynamic import to avoid top-level puppeteer load on every request
   const puppeteer = await import('puppeteer');
   const browser = await puppeteer.default.launch({
     headless: true,
