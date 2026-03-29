@@ -18,6 +18,11 @@ module.exports = {
           900: '#1e3a8a',
         },
       },
+      fontFamily: {
+        sans:    ['var(--font-body)', 'ui-sans-serif', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['var(--font-display)', 'Georgia', 'serif'],
+        code:    ['var(--font-code)', 'ui-monospace', 'Courier New', 'monospace'],
+      },
     },
   },
   plugins: [],
