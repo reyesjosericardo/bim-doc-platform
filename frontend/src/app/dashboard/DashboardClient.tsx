@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { signOut } from 'next-auth/react';
 import Link from 'next/link';
 import type { Session } from 'next-auth';
-import type { OIRWithProgress, Project } from '@/types/oir';
+import type { OIRWithProgress, EIRWithProgress, Project } from '@/types/oir';
 import { StatusBadge } from '@/components/ui/StatusBadge';
 
 interface Props { session: Session }
@@ -12,6 +12,7 @@ interface Props { session: Session }
 export function DashboardClient({ session }: Props) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [oirsByProject, setOirsByProject] = useState<Record<string, OIRWithProgress[]>>({});
+  const [eirsByProject, setEirsByProject] = useState<Record<string, EIRWithProgress[]>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,13 +24,19 @@ export function DashboardClient({ session }: Props) {
           setProjects(data);
 
           const oirMap: Record<string, OIRWithProgress[]> = {};
+          const eirMap: Record<string, EIRWithProgress[]> = {};
           await Promise.all(
             data.map(async (p) => {
-              const r = await fetch(`/api/projects/${p.id}/oir`);
-              if (r.ok) oirMap[p.id] = await r.json();
+              const [oirRes, eirRes] = await Promise.all([
+                fetch(`/api/projects/${p.id}/oir`),
+                fetch(`/api/projects/${p.id}/eir`),
+              ]);
+              if (oirRes.ok) oirMap[p.id] = await oirRes.json();
+              if (eirRes.ok) eirMap[p.id] = await eirRes.json();
             })
           );
           setOirsByProject(oirMap);
+          setEirsByProject(eirMap);
         }
       } catch {
         // Silently fail
@@ -96,11 +103,13 @@ export function DashboardClient({ session }: Props) {
           <div className="space-y-6">
             {projects.map((project) => {
               const oirs = oirsByProject[project.id] ?? [];
+              const eirs = eirsByProject[project.id] ?? [];
               return (
                 <ProjectCard
                   key={project.id}
                   project={project}
                   oirs={oirs}
+                  eirs={eirs}
                 />
               );
             })}
@@ -111,9 +120,9 @@ export function DashboardClient({ session }: Props) {
   );
 }
 
-function ProjectCard({ project, oirs }: { project: Project; oirs: OIRWithProgress[] }) {
+function ProjectCard({ project, oirs, eirs }: { project: Project; oirs: OIRWithProgress[]; eirs: EIRWithProgress[] }) {
   const hasOIR = oirs.length > 0;
-  const mainOIR = oirs[0];
+  const hasEIR = eirs.length > 0;
 
   return (
     <div className="card">
@@ -155,6 +164,30 @@ function ProjectCard({ project, oirs }: { project: Project; oirs: OIRWithProgres
           <p className="text-sm text-gray-400 italic">No hay OIR iniciado para este proyecto.</p>
         )}
       </div>
+
+      {/* EIR section */}
+      <div className="border-t border-gray-100 pt-4">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-medium text-gray-700">EIR — Requisitos de Intercambio de Información</h3>
+          {!hasEIR && (
+            <Link
+              href={`/documents/eir/new?projectId=${project.id}`}
+              className="btn-primary text-xs py-1.5"
+            >
+              Iniciar EIR
+            </Link>
+          )}
+        </div>
+        {hasEIR ? (
+          <div className="space-y-3">
+            {eirs.map((eir) => (
+              <EIRRow key={eir.id} eir={eir} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-400 italic">No hay EIR iniciado para este proyecto.</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -194,6 +227,45 @@ function OIRRow({ oir }: { oir: OIRWithProgress }) {
         className="btn-secondary text-xs py-1.5 flex-shrink-0"
       >
         {oir.progress_pct < 100 ? 'Continuar' : 'Ver / Editar'}
+      </Link>
+    </div>
+  );
+}
+
+function EIRRow({ eir }: { eir: EIRWithProgress }) {
+  return (
+    <div className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg">
+      <div className="relative w-12 h-12 flex-shrink-0">
+        <svg className="w-12 h-12 -rotate-90" viewBox="0 0 36 36">
+          <circle cx="18" cy="18" r="14" fill="none" stroke="#e5e7eb" strokeWidth="3" />
+          <circle
+            cx="18" cy="18" r="14" fill="none"
+            stroke="#7c3aed" strokeWidth="3"
+            strokeDasharray={`${(eir.progress_pct / 100) * 87.96} 87.96`}
+            strokeLinecap="round"
+          />
+        </svg>
+        <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-purple-700">
+          {eir.progress_pct}%
+        </span>
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-sm font-medium text-gray-900">EIR v{eir.version}</span>
+          <StatusBadge status={eir.status} />
+        </div>
+        <p className="text-xs text-gray-500">
+          {eir.answered_count}/{eir.total_questions} preguntas respondidas ·
+          Actualizado {new Date(eir.updated_at).toLocaleDateString('es-ES')}
+        </p>
+      </div>
+
+      <Link
+        href={`/documents/eir/${eir.id}`}
+        className="btn-secondary text-xs py-1.5 flex-shrink-0"
+      >
+        {eir.progress_pct < 100 ? 'Continuar' : 'Ver / Editar'}
       </Link>
     </div>
   );

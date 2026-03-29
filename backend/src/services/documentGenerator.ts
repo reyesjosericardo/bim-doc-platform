@@ -11,6 +11,10 @@ import { mapAnswersToVars } from './oirMapper';
 import { enrichOirWithLLM } from './oirLLMEnricher';
 import { buildOirDocx } from './oirWordBuilder';
 import { buildOirHtml } from './oirHtmlBuilder';
+import { mapEirAnswersToVars } from './eirMapper';
+import { enrichEirWithLLM } from './eirLLMEnricher';
+import { buildEirDocx } from './eirWordBuilder';
+import { buildEirHtml } from './eirHtmlBuilder';
 
 const prisma = new PrismaClient();
 
@@ -98,6 +102,79 @@ export async function generateOirDocuments(
     docxPath,
     pdfPath,
   };
+}
+
+export async function generateEirDocuments(
+  documentId: string,
+): Promise<GeneratedFiles> {
+  const doc = await prisma.bimDocument.findUniqueOrThrow({
+    where: { id: documentId },
+    include: {
+      questionnaire_answers: true,
+      project: { select: { name: true } },
+    },
+  });
+
+  const baseVars = mapEirAnswersToVars(doc.questionnaire_answers, {
+    project_name: doc.project.name,
+    version: doc.version,
+    status: doc.status,
+  });
+
+  const vars = await enrichEirWithLLM(baseVars);
+
+  await fs.mkdir(STORAGE_DIR, { recursive: true });
+
+  const baseName = `${documentId}_EIR_v${doc.version}`;
+  const docxPath = path.join(STORAGE_DIR, `${baseName}.docx`);
+  const pdfPath  = path.join(STORAGE_DIR, `${baseName}.pdf`);
+
+  const docxBuffer = await buildEirDocx(vars);
+  await fs.writeFile(docxPath, docxBuffer);
+
+  const html = buildEirHtml(vars);
+  await renderHtmlToPdf(html, pdfPath);
+
+  const baseUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+
+  await prisma.$transaction([
+    prisma.generatedFile.upsert({
+      where:  { id: `${documentId}-eir-docx` },
+      update: { file_url: `${baseUrl}/api/documents/eir/${documentId}/download/docx`, generated_at: new Date() },
+      create: {
+        id: `${documentId}-eir-docx`,
+        document_id: documentId,
+        file_format: 'docx',
+        file_url: `${baseUrl}/api/documents/eir/${documentId}/download/docx`,
+      },
+    }),
+    prisma.generatedFile.upsert({
+      where:  { id: `${documentId}-eir-pdf` },
+      update: { file_url: `${baseUrl}/api/documents/eir/${documentId}/download/pdf`, generated_at: new Date() },
+      create: {
+        id: `${documentId}-eir-pdf`,
+        document_id: documentId,
+        file_format: 'pdf',
+        file_url: `${baseUrl}/api/documents/eir/${documentId}/download/pdf`,
+      },
+    }),
+  ]);
+
+  return {
+    docxUrl:  `${baseUrl}/api/documents/eir/${documentId}/download/docx`,
+    pdfUrl:   `${baseUrl}/api/documents/eir/${documentId}/download/pdf`,
+    docxPath,
+    pdfPath,
+  };
+}
+
+export function getEirGeneratedFilePath(
+  documentId: string,
+  version: number,
+  format: 'docx' | 'pdf',
+): string {
+  const ext = format;
+  return path.join(STORAGE_DIR, `${documentId}_EIR_v${version}.${ext}`);
 }
 
 export function getGeneratedFilePath(

@@ -29,6 +29,25 @@ export interface OIRWithProgress extends OIRDocument {
   project: { id: string; name: string };
 }
 
+export interface EIRDocument {
+  id: string;
+  project_id: string;
+  status: DocumentStatus;
+  version: number;
+  created_by: string;
+  approved_by: string | null;
+  created_at: string;
+  updated_at: string;
+  questionnaire_answers: Answer[];
+}
+
+export interface EIRWithProgress extends EIRDocument {
+  answered_count: number;
+  total_questions: number;
+  progress_pct: number;
+  project: { id: string; name: string };
+}
+
 export interface Project {
   id: string;
   name: string;

@@ -12,7 +12,7 @@ interface FieldProps {
   onChange: (id: string, value: string) => void;
 }
 
-interface TextFieldProps extends FieldProps { type?: 'text' | 'textarea'; maxLength?: number }
+interface TextFieldProps extends FieldProps { type?: 'text' | 'textarea'; maxLength?: number; placeholder?: string }
 interface SelectFieldProps extends FieldProps { options: Option[] }
 interface MultiSelectFieldProps extends FieldProps { options: Option[] }
 interface BooleanFieldProps extends FieldProps {}
@@ -21,7 +21,7 @@ function RequiredMark() {
   return <span className="text-red-500 ml-0.5">*</span>;
 }
 
-export function TextField({ id, label, required, answers, onChange, type = 'text', maxLength }: TextFieldProps) {
+export function TextField({ id, label, required, answers, onChange, type = 'text', maxLength, placeholder = 'Escribe aquí...' }: TextFieldProps) {
   const value = answers[id] ?? '';
   if (type === 'textarea') {
     return (
@@ -33,7 +33,7 @@ export function TextField({ id, label, required, answers, onChange, type = 'text
           maxLength={maxLength}
           rows={4}
           className="input-field resize-none"
-          placeholder="Escribe aquí..."
+          placeholder={placeholder}
         />
         {maxLength && (
           <p className="mt-1 text-xs text-gray-400 text-right">{value.length}/{maxLength}</p>
@@ -49,7 +49,7 @@ export function TextField({ id, label, required, answers, onChange, type = 'text
         value={value}
         onChange={(e) => onChange(id, e.target.value)}
         className="input-field"
-        placeholder="Escribe aquí..."
+        placeholder={placeholder}
       />
     </div>
   );
@@ -100,6 +100,10 @@ export function MultiSelectField({ id, label, required, answers, onChange, optio
       </div>
     </div>
   );
+}
+
+export function TextareaField({ id, label, required, answers, onChange, placeholder }: TextFieldProps) {
+  return <TextField id={id} label={label} required={required} answers={answers} onChange={onChange} type="textarea" placeholder={placeholder} />;
 }
 
 export function BooleanField({ id, label, required, answers, onChange }: BooleanFieldProps) {
