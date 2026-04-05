@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm list:*)",
+      "Bash(npx tsc:*)",
+      "Bash(/c/Users/reyes/AppData/Roaming/npm/railway status:*)"
+    ]
+  }
+}

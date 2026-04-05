@@ -313,6 +313,99 @@ router.get('/oir/:id/download/:format', requireAuth, async (req: AuthRequest, re
   }
 });
 
+// ─── OIR Narratives ───────────────────────────────────────────────────────────
+
+// POST /api/documents/oir/:id/narratives/generate — call LLM and save narratives
+router.post('/oir/:id/narratives/generate', requireAuth, async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const document = await prisma.bimDocument.findUnique({
+      where: { id, document_type: 'OIR' },
+      include: {
+        questionnaire_answers: true,
+        project: { select: { name: true } },
+      },
+    });
+    if (!document) return res.status(404).json({ error: 'OIR document not found' });
+
+    const { mapAnswersToVars } = await import('../services/oirMapper');
+    const { enrichOirWithLLM } = await import('../services/oirLLMEnricher');
+
+    const baseVars = mapAnswersToVars(document.questionnaire_answers, {
+      project_name: document.project.name,
+      version: document.version,
+      status: document.status,
+    });
+
+    const enriched = await enrichOirWithLLM(baseVars);
+
+    // Extract only narrative keys
+    const narrativeKeys = [
+      'intro_context',
+      's2_1_perfil', 's2_2_estandares', 's2_3_responsable',
+      's3_1_usos_bim', 's3_2_objetivo', 's3_3_plan_activos', 's3_4_regulatorio',
+      's4_1_registro', 's4_2_om', 's4_3_riesgos', 's4_4_impactos', 's4_5_eol',
+      's5_1_formatos', 's5_2_clasificacion', 's5_3_cde', 's5_4_nivel_info',
+      's6_1_frecuencia', 's6_2_seguridad', 's6_3_retencion',
+      's7_observaciones',
+    ] as const;
+
+    const narratives: Record<string, string> = {};
+    for (const key of narrativeKeys) {
+      narratives[key] = enriched[key] ?? '';
+    }
+
+    // Wrap each narrative as HTML paragraph for the rich text editor
+    const narrativesHtml: Record<string, string> = {};
+    for (const [key, val] of Object.entries(narratives)) {
+      narrativesHtml[key] = val ? `<p>${val}</p>` : '<p></p>';
+    }
+
+    await prisma.bimDocument.update({
+      where: { id },
+      data: { narratives: narrativesHtml },
+    });
+
+    return res.json({ narratives: narrativesHtml });
+  } catch (error) {
+    console.error('Error generating narratives:', error);
+    return res.status(500).json({ error: 'Failed to generate narratives', detail: String(error) });
+  }
+});
+
+// GET /api/documents/oir/:id/narratives — return saved narratives
+router.get('/oir/:id/narratives', requireAuth, async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  try {
+    const document = await prisma.bimDocument.findUnique({
+      where: { id, document_type: 'OIR' },
+      select: { narratives: true },
+    });
+    if (!document) return res.status(404).json({ error: 'OIR document not found' });
+    return res.json({ narratives: document.narratives ?? null });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to fetch narratives' });
+  }
+});
+
+// PATCH /api/documents/oir/:id/narratives — save edited narratives
+router.patch('/oir/:id/narratives', requireAuth, async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  const { narratives } = req.body;
+  if (!narratives || typeof narratives !== 'object') {
+    return res.status(400).json({ error: 'narratives must be an object' });
+  }
+  try {
+    await prisma.bimDocument.update({
+      where: { id },
+      data: { narratives },
+    });
+    return res.json({ ok: true });
+  } catch (error) {
+    return res.status(500).json({ error: 'Failed to save narratives' });
+  }
+});
+
 // ─── EIR Routes ───────────────────────────────────────────────────────────────
 
 const createEirSchema = z.object({

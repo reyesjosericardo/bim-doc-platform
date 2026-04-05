@@ -49,8 +49,39 @@ export async function generateOirDocuments(
     status: doc.status,
   });
 
-  // 3. Enrich with LLM-generated narratives
-  const vars = await enrichOirWithLLM(baseVars);
+  // 3. Use saved narratives if available, otherwise call LLM
+  let vars: import('./oirLLMEnricher').OIREnrichedVars;
+  if (doc.narratives && typeof doc.narratives === 'object') {
+    const saved = doc.narratives as Record<string, string>;
+    // Strip HTML tags to get plain text for Word/PDF builders
+    const stripHtml = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    vars = {
+      ...baseVars,
+      intro_context:      stripHtml(saved['intro_context'] ?? ''),
+      s2_1_perfil:        stripHtml(saved['s2_1_perfil'] ?? ''),
+      s2_2_estandares:    stripHtml(saved['s2_2_estandares'] ?? ''),
+      s2_3_responsable:   stripHtml(saved['s2_3_responsable'] ?? ''),
+      s3_1_usos_bim:      stripHtml(saved['s3_1_usos_bim'] ?? ''),
+      s3_2_objetivo:      stripHtml(saved['s3_2_objetivo'] ?? ''),
+      s3_3_plan_activos:  stripHtml(saved['s3_3_plan_activos'] ?? ''),
+      s3_4_regulatorio:   stripHtml(saved['s3_4_regulatorio'] ?? ''),
+      s4_1_registro:      stripHtml(saved['s4_1_registro'] ?? ''),
+      s4_2_om:            stripHtml(saved['s4_2_om'] ?? ''),
+      s4_3_riesgos:       stripHtml(saved['s4_3_riesgos'] ?? ''),
+      s4_4_impactos:      stripHtml(saved['s4_4_impactos'] ?? ''),
+      s4_5_eol:           stripHtml(saved['s4_5_eol'] ?? ''),
+      s5_1_formatos:      stripHtml(saved['s5_1_formatos'] ?? ''),
+      s5_2_clasificacion: stripHtml(saved['s5_2_clasificacion'] ?? ''),
+      s5_3_cde:           stripHtml(saved['s5_3_cde'] ?? ''),
+      s5_4_nivel_info:    stripHtml(saved['s5_4_nivel_info'] ?? ''),
+      s6_1_frecuencia:    stripHtml(saved['s6_1_frecuencia'] ?? ''),
+      s6_2_seguridad:     stripHtml(saved['s6_2_seguridad'] ?? ''),
+      s6_3_retencion:     stripHtml(saved['s6_3_retencion'] ?? ''),
+      s7_observaciones:   stripHtml(saved['s7_observaciones'] ?? ''),
+    };
+  } else {
+    vars = await enrichOirWithLLM(baseVars);
+  }
 
   // 4. Ensure storage directory exists
   await fs.mkdir(STORAGE_DIR, { recursive: true });

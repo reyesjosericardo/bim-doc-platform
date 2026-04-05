@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { ProgressBar } from '../ui/ProgressBar';
 import { StatusBadge } from '../ui/StatusBadge';
 import { GenerateDocumentButton } from './GenerateDocumentButton';
+import { NarrativesEditor, type OIRNarrativesMap } from './NarrativesEditor';
 import { Block1 } from './blocks/Block1';
 import { Block2 } from './blocks/Block2';
 import { Block3 } from './blocks/Block3';
@@ -46,7 +47,19 @@ export function OIRForm({ documentId, projectId, initialAnswers = {}, initialSta
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState('');
   const [errors, setErrors] = useState<string[]>([]);
+  const [savedNarratives, setSavedNarratives] = useState<OIRNarrativesMap | null>(null);
   const docIdRef = useRef<string | undefined>(documentId);
+
+  // Load existing narratives when document exists
+  useEffect(() => {
+    if (!documentId) return;
+    fetch(`/api/documents/oir/${documentId}/narratives`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.narratives) setSavedNarratives(data.narratives);
+      })
+      .catch(() => {});
+  }, [documentId]);
 
   // Base questions always visible (23). Conditional questions only count when their trigger = 'Sí'
   const CONDITIONAL_TRIGGERS: Record<string, string> = {
@@ -220,6 +233,16 @@ export function OIRForm({ documentId, projectId, initialAnswers = {}, initialSta
           {activeBlock === 3 && <Block4 answers={answers} onChange={handleChange} />}
           {activeBlock === 4 && <Block5 answers={answers} onChange={handleChange} />}
         </div>
+
+        {/* Narratives editor — visible on last block when document exists */}
+        {activeBlock === BLOCKS.length - 1 && docIdRef.current && (
+          <div className="card mb-6">
+            <NarrativesEditor
+              documentId={docIdRef.current}
+              initialNarratives={savedNarratives}
+            />
+          </div>
+        )}
 
         {/* Generate document panel — visible on last block when document exists */}
         {activeBlock === BLOCKS.length - 1 && docIdRef.current && (
