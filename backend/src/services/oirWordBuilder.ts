@@ -299,12 +299,18 @@ export async function buildOirDocx(
       ...(vars.has_cde === 'Sí' ? kv('Plataforma CDE', vars.cde_platform) : []),
     ] : []),
 
-    h3('5.4 Nivel de información necesario'),
+    h3('5.4 Nivel de información necesario (LOIN)'),
     ...nar(vars.s5_4_nivel_info),
     ...(full ? [
-      body('Referencia normativa: ISO 19650-1 §11.2', { italic: true }),
-      ...kv('¿Nivel de información necesario definido?', vars.has_lod),
-      ...(vars.has_lod === 'Sí' ? kv('Nivel mínimo requerido', vars.lod_level) : []),
+      body('Referencia normativa: ISO 19650-1 §11.2 · EN 17412-1', { italic: true }),
+      ...kv('¿LOIN definido por la organización?', vars.has_loin),
+      ...(vars.has_loin === 'Sí' ? [
+        ...kv('Información geométrica', vars.loin_geometric),
+        ...kv('Información alfanumérica', ''),
+        ...multilineBody(vars.loin_alphanumeric_list),
+        ...kv('Documentación asociada', ''),
+        ...multilineBody(vars.loin_documentation_list),
+      ] : []),
     ] : []),
     divider(),
 

@@ -27,7 +27,9 @@ const FULL_ANSWERS = [
   { question_id: 'OIR-4.3', answer_value: 'Sí' },
   { question_id: 'OIR-4.4', answer_value: 'ACC' },
   { question_id: 'OIR-4.5', answer_value: 'Sí' },
-  { question_id: 'OIR-4.6', answer_value: 'LOG 3 definido' },
+  { question_id: 'OIR-4.6', answer_value: 'especifico' },
+  { question_id: 'OIR-4.7', answer_value: 'Propiedades técnicas y funcionales|Datos de operación y mantenimiento' },
+  { question_id: 'OIR-4.8', answer_value: 'Fichas técnicas|Manuales de operación y mantenimiento' },
   { question_id: 'OIR-5.1', answer_value: 'Trimestral' },
   { question_id: 'OIR-5.2', answer_value: 'No' },
   { question_id: 'OIR-5.4', answer_value: '10 años' },
@@ -51,8 +53,10 @@ describe('oirMapper — mapAnswersToVars', () => {
     expect(vars.classification_system).toBe('UniClass 2015');
     expect(vars.has_cde).toBe('Sí');
     expect(vars.cde_platform).toBe('ACC');
-    expect(vars.has_lod).toBe('Sí');
-    expect(vars.lod_level).toBe('Nivel 3 — Representación específica');
+    expect(vars.has_loin).toBe('Sí');
+    expect(vars.loin_geometric).toBe('Específica (geometría y dimensiones definidas)');
+    expect(vars.loin_alphanumeric_list).toContain('1. Propiedades técnicas y funcionales');
+    expect(vars.loin_documentation_list).toContain('1. Fichas técnicas');
     expect(vars.update_frequency).toBe('Trimestral');
     expect(vars.retention_policy).toBe('10 años');
     expect(vars.has_security).toBe('No');

@@ -25,8 +25,8 @@ const dmSans = DM_Sans({
 });
 
 export const metadata: Metadata = {
-  title: 'BIM Doc Platform',
-  description: 'Plataforma de gestión de documentos BIM',
+  title: 'Incoestructura · BIM·Doc',
+  description: 'Plataforma documental BIM ISO 19650 — Incoestructura',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -3,8 +3,6 @@
 import { SelectField, MultiSelectField, BooleanField } from '../FormField';
 import type { AnswersMap } from '@/types/oir';
 
-interface NivelOption { value: string; label: string; description: string }
-
 interface Props {
   answers: AnswersMap;
   onChange: (id: string, value: string) => void;
@@ -44,23 +42,46 @@ const PLATAFORMA_CDE_OPTIONS = [
   { value: 'Otra', label: 'Otra' },
 ];
 
-const NIVEL_INFO_OPTIONS: NivelOption[] = [
-  { value: 'nivel_1', label: 'Nivel 1 — Representación conceptual',   description: 'Masa, volumen aproximado, ubicación genérica' },
-  { value: 'nivel_2', label: 'Nivel 2 — Representación genérica',     description: 'Geometría esquemática, sistemas definidos, clasificación básica' },
-  { value: 'nivel_3', label: 'Nivel 3 — Representación específica',   description: 'Geometría definida, especificaciones técnicas, datos de producto' },
-  { value: 'nivel_4', label: 'Nivel 4 — Representación detallada',    description: 'Geometría de fabricación y ensamblaje, datos completos de instalación' },
-  { value: 'nivel_5', label: 'Nivel 5 — Representación construida (as-built)', description: 'Condición real verificada del activo, datos operativos completos' },
+// LOIN — EN 17412-1: información geométrica (escala descriptiva, orientada al propósito)
+const LOIN_GEOMETRIC_OPTIONS = [
+  { value: 'simbolico',   label: 'Simbólica / 2D (sin geometría 3D significativa)' },
+  { value: 'conceptual',  label: 'Conceptual (masa o volumen aproximado)' },
+  { value: 'generico',    label: 'Genérica (forma y dimensiones esquemáticas)' },
+  { value: 'especifico',  label: 'Específica (geometría y dimensiones definidas)' },
+  { value: 'fabricacion', label: 'Detallada para fabricación y montaje' },
+  { value: 'construido',  label: 'Tal como construido (as-built verificado)' },
+];
+
+// LOIN — EN 17412-1: información alfanumérica (datos/atributos)
+const LOIN_ALPHANUMERIC_OPTIONS = [
+  { value: 'Identificación y clasificación', label: 'Identificación y clasificación' },
+  { value: 'Propiedades técnicas y funcionales', label: 'Propiedades técnicas y funcionales' },
+  { value: 'Datos del fabricante y producto', label: 'Datos del fabricante y producto' },
+  { value: 'Datos de coste', label: 'Datos de coste' },
+  { value: 'Datos de garantía', label: 'Datos de garantía' },
+  { value: 'Datos de operación y mantenimiento', label: 'Datos de operación y mantenimiento' },
+  { value: 'Datos de sostenibilidad y energía', label: 'Datos de sostenibilidad y energía' },
+];
+
+// LOIN — EN 17412-1: documentación asociada
+const LOIN_DOCUMENTATION_OPTIONS = [
+  { value: 'Fichas técnicas', label: 'Fichas técnicas' },
+  { value: 'Certificados y homologaciones', label: 'Certificados y homologaciones' },
+  { value: 'Manuales de operación y mantenimiento', label: 'Manuales de operación y mantenimiento' },
+  { value: 'Garantías', label: 'Garantías' },
+  { value: 'Planos as-built', label: 'Planos as-built' },
+  { value: 'Instrucciones de instalación', label: 'Instrucciones de instalación' },
 ];
 
 export function Block4({ answers, onChange }: Props) {
   const usaCDE = answers['OIR-4.3'] === 'Sí';
-  const tieneLOD = answers['OIR-4.5'] === 'Sí';
+  const tieneLOIN = answers['OIR-4.5'] === 'Sí';
 
   return (
     <div className="space-y-6">
       <div className="mb-6">
         <h2 className="text-xl font-semibold text-gray-900">Bloque 4 — Estándares y formatos</h2>
-        <p className="text-sm text-gray-500 mt-1">Interoperabilidad y herramientas (OIR-4.1 a OIR-4.6)</p>
+        <p className="text-sm text-gray-500 mt-1">Interoperabilidad, herramientas y LOIN (OIR-4.1 a OIR-4.8)</p>
       </div>
 
       <MultiSelectField
@@ -83,7 +104,7 @@ export function Block4({ answers, onChange }: Props) {
 
       <SelectField
         id="OIR-4.3"
-        label="OIR-4.3 ¿Usa o planea usar CDE (Common Data Environment)?"
+        label="OIR-4.3 ¿Usa o planea usar un entorno común de datos (CDE)?"
         required
         options={CDE_OPTIONS}
         answers={answers}
@@ -104,38 +125,42 @@ export function Block4({ answers, onChange }: Props) {
 
       <BooleanField
         id="OIR-4.5"
-        label="OIR-4.5 ¿Tiene la organización definido un nivel de información necesario para sus activos según ISO 19650-1 §11.2?"
+        label="OIR-4.5 ¿Define la organización un nivel de información necesario (LOIN) para sus activos? (ISO 19650-1 §11.2 · EN 17412-1)"
         required
         answers={answers}
         onChange={onChange}
       />
 
-      {tieneLOD && (
-        <div className="pl-4 border-l-2 border-brand-200 bg-brand-50 rounded-r-lg p-4">
-          <label className="label">
-            OIR-4.6 ¿Qué nivel de información necesario (geométrico y alfanumérico) requiere la organización como mínimo?
-          </label>
-          <div className="space-y-2 mt-2">
-            {NIVEL_INFO_OPTIONS.map((opt) => (
-              <label
-                key={opt.value}
-                className="flex items-start gap-3 cursor-pointer group p-2 rounded hover:bg-blue-50"
-              >
-                <input
-                  type="radio"
-                  name="OIR-4.6"
-                  value={opt.value}
-                  checked={answers['OIR-4.6'] === opt.value}
-                  onChange={() => onChange('OIR-4.6', opt.value)}
-                  className="h-4 w-4 mt-0.5 border-gray-300 text-brand-600 focus:ring-brand-500"
-                />
-                <div>
-                  <span className="text-sm font-medium text-gray-700">{opt.label}</span>
-                  <p className="text-xs text-gray-500 mt-0.5">{opt.description}</p>
-                </div>
-              </label>
-            ))}
-          </div>
+      {tieneLOIN && (
+        <div className="pl-4 border-l-2 border-brand-200 bg-brand-50 rounded-r-lg p-4 space-y-5">
+          <p className="text-xs text-gray-600">
+            El LOIN se define por sus tres componentes (EN 17412-1). El detalle debe ser
+            <strong> el necesario para el propósito, sin exceso</strong>.
+          </p>
+
+          <SelectField
+            id="OIR-4.6"
+            label="OIR-4.6 Información geométrica requerida"
+            options={LOIN_GEOMETRIC_OPTIONS}
+            answers={answers}
+            onChange={onChange}
+          />
+
+          <MultiSelectField
+            id="OIR-4.7"
+            label="OIR-4.7 Información alfanumérica requerida"
+            options={LOIN_ALPHANUMERIC_OPTIONS}
+            answers={answers}
+            onChange={onChange}
+          />
+
+          <MultiSelectField
+            id="OIR-4.8"
+            label="OIR-4.8 Documentación asociada requerida"
+            options={LOIN_DOCUMENTATION_OPTIONS}
+            answers={answers}
+            onChange={onChange}
+          />
         </div>
       )}
     </div>

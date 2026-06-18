@@ -8,11 +8,11 @@ const prisma = new PrismaClient();
 const CONDITIONAL_TRIGGERS: Record<string, string> = {
   'EIR-3.4': 'EIR-3.3',
   'EIR-4.5': 'EIR-4.4',
-  'EIR-5.4': 'EIR-5.3',
+  'EIR-5.5': 'EIR-5.4',
   'EIR-6.2': 'EIR-6.1',
   'EIR-6.6': 'EIR-6.5',
 };
-const BASE_COUNT = 26;
+const BASE_COUNT = 27;
 
 function calcProgress(answers: { question_id: string; answer_value: string }[]) {
   const answerMap: Record<string, string> = {};

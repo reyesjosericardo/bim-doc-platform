@@ -59,7 +59,7 @@ export function Block1({ answers, onChange }: Props) {
 
       <SelectField
         id="OIR-1.3"
-        label="OIR-1.3 Sector principal"
+        label="OIR-1.3 Sector principal de actividad"
         required
         options={SECTOR_OPTIONS}
         answers={answers}
@@ -76,7 +76,7 @@ export function Block1({ answers, onChange }: Props) {
 
       <MultiSelectField
         id="OIR-1.5"
-        label="OIR-1.5 Estándares BIM reconocidos"
+        label="OIR-1.5 Estándares BIM adoptados por la organización"
         required
         options={ESTANDARES_OPTIONS}
         answers={answers}
@@ -85,7 +85,7 @@ export function Block1({ answers, onChange }: Props) {
 
       <TextField
         id="OIR-1.6"
-        label="OIR-1.6 Responsable de gestión de información"
+        label="OIR-1.6 Responsable de la función de gestión de la información"
         required
         answers={answers}
         onChange={onChange}

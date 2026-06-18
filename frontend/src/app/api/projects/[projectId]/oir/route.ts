@@ -9,7 +9,8 @@ const prisma = new PrismaClient();
 const CONDITIONAL_TRIGGERS: Record<string, string> = {
   'OIR-2.4': 'OIR-2.3', 'OIR-2.6': 'OIR-2.5',
   'OIR-3.4': 'OIR-3.3', 'OIR-3.7': 'OIR-3.6',
-  'OIR-4.4': 'OIR-4.3', 'OIR-4.6': 'OIR-4.5',
+  'OIR-4.4': 'OIR-4.3',
+  'OIR-4.6': 'OIR-4.5', 'OIR-4.7': 'OIR-4.5', 'OIR-4.8': 'OIR-4.5',
   'OIR-5.3': 'OIR-5.2', 'OIR-5.6': 'OIR-5.5',
 };
 const BASE_COUNT = 23;

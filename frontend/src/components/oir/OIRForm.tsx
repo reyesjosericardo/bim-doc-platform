@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { ProgressBar } from '../ui/ProgressBar';
 import { StatusBadge } from '../ui/StatusBadge';
+import { CubeMark } from '../ui/CubeMark';
 import { GenerateDocumentButton } from './GenerateDocumentButton';
 import { NarrativesEditor, type OIRNarrativesMap } from './NarrativesEditor';
 import { Block1 } from './blocks/Block1';
@@ -65,7 +66,8 @@ export function OIRForm({ documentId, projectId, initialAnswers = {}, initialSta
   const CONDITIONAL_TRIGGERS: Record<string, string> = {
     'OIR-2.4': 'OIR-2.3', 'OIR-2.6': 'OIR-2.5',
     'OIR-3.4': 'OIR-3.3', 'OIR-3.7': 'OIR-3.6',
-    'OIR-4.4': 'OIR-4.3', 'OIR-4.6': 'OIR-4.5',
+    'OIR-4.4': 'OIR-4.3',
+    'OIR-4.6': 'OIR-4.5', 'OIR-4.7': 'OIR-4.5', 'OIR-4.8': 'OIR-4.5',
     'OIR-5.3': 'OIR-5.2', 'OIR-5.6': 'OIR-5.5',
   };
   const BASE_COUNT = 23;
@@ -179,17 +181,21 @@ export function OIRForm({ documentId, projectId, initialAnswers = {}, initialSta
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="bp-canvas min-h-screen relative">
+      <div className="brand-grid fixed inset-0 pointer-events-none" />
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">
-              OIR — Requisitos de Información Organizacional
-            </h1>
-            <p className="text-xs text-gray-500">ISO 19650 — Sprint 2</p>
+      <div className="sticky top-0 z-10 border-b border-[#EEE9DB]/[0.07] bg-[#141B16]/90 backdrop-blur-xl">
+        <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <CubeMark className="w-7 h-7 flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="font-display text-[15px] text-[#EEE9DB] leading-tight truncate">
+                OIR — Requisitos de Información Organizacional
+              </h1>
+              <p className="font-code text-[10px] text-[#8FA88E]/70 tracking-wider uppercase">Incoestructura · ISO 19650-1</p>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <StatusBadge status={status} />
             {canApprove && status === 'en_revision' && (
               <button
@@ -318,7 +324,7 @@ function inferAnswerType(questionId: string): string {
   // Determine answer type from question ID
   const textareaQuestions = ['OIR-2.2', 'OIR-2.6', 'OIR-5.6'];
   const booleanQuestions = ['OIR-2.3', 'OIR-2.5', 'OIR-3.3', 'OIR-3.6', 'OIR-4.5', 'OIR-5.2', 'OIR-5.5'];
-  const multiSelectQuestions = ['OIR-1.5', 'OIR-2.1', 'OIR-3.1', 'OIR-3.2', 'OIR-3.4', 'OIR-3.5', 'OIR-3.7', 'OIR-4.1', 'OIR-5.3'];
+  const multiSelectQuestions = ['OIR-1.5', 'OIR-2.1', 'OIR-3.1', 'OIR-3.2', 'OIR-3.4', 'OIR-3.5', 'OIR-3.7', 'OIR-4.1', 'OIR-4.7', 'OIR-4.8', 'OIR-5.3'];
   const selectQuestions = ['OIR-1.2', 'OIR-1.3', 'OIR-2.4', 'OIR-4.2', 'OIR-4.3', 'OIR-4.4', 'OIR-4.6', 'OIR-5.1', 'OIR-5.4'];
 
   if (textareaQuestions.includes(questionId)) return 'textarea';

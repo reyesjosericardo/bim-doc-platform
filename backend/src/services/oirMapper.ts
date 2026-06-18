@@ -36,8 +36,10 @@ export interface OIRTemplateVars {
   classification_system: string;
   has_cde: string;
   cde_platform: string;
-  has_lod: string;
-  lod_level: string;
+  has_loin: string;
+  loin_geometric: string;
+  loin_alphanumeric_list: string;
+  loin_documentation_list: string;
   // Block 5
   update_frequency: string;
   has_security: string;
@@ -78,20 +80,28 @@ const BIM_USES_CATALOG: Record<string, { es: string; en: string; fase: string }>
   'BU-25': { es: 'Planificación ante emergencias y desastres',   en: 'Disaster Planning',               fase: 'Operación' },
 };
 
-// ─── Nivel de información necesario (ISO 19650-1 §11.2) ───────────────────────
+// ─── Nivel de información necesario / LOIN (ISO 19650-1 §11.2 · EN 17412-1) ────
+// LOIN se define por sus tres componentes: información geométrica, alfanumérica
+// y documental — no por una escala única tipo LOD.
 
-const LOD_LEVELS: Record<string, string> = {
-  'nivel_1': 'Nivel 1 — Representación conceptual',
-  'nivel_2': 'Nivel 2 — Representación genérica',
-  'nivel_3': 'Nivel 3 — Representación específica',
-  'nivel_4': 'Nivel 4 — Representación detallada',
-  'nivel_5': 'Nivel 5 — Representación construida (as-built)',
-  // backward compatibility — legacy LOG values
-  'LOG 1 conceptual':  'Nivel 1 — Representación conceptual',
-  'LOG 2 esquemático': 'Nivel 2 — Representación genérica',
-  'LOG 3 definido':    'Nivel 3 — Representación específica',
-  'LOG 4 detallado':   'Nivel 4 — Representación detallada',
-  'LOG 5 construido':  'Nivel 5 — Representación construida (as-built)',
+const GEOMETRIC_LEVELS: Record<string, string> = {
+  simbolico:   'Simbólica / 2D (sin geometría 3D significativa)',
+  conceptual:  'Conceptual (masa o volumen aproximado)',
+  generico:    'Genérica (forma y dimensiones esquemáticas)',
+  especifico:  'Específica (geometría y dimensiones definidas)',
+  fabricacion: 'Detallada para fabricación y montaje',
+  construido:  'Tal como construido (as-built verificado)',
+  // backward compatibility — legacy escala LOD/LOG y niveles numéricos
+  'nivel_1':           'Conceptual (masa o volumen aproximado)',
+  'nivel_2':           'Genérica (forma y dimensiones esquemáticas)',
+  'nivel_3':           'Específica (geometría y dimensiones definidas)',
+  'nivel_4':           'Detallada para fabricación y montaje',
+  'nivel_5':           'Tal como construido (as-built verificado)',
+  'LOG 1 conceptual':  'Conceptual (masa o volumen aproximado)',
+  'LOG 2 esquemático': 'Genérica (forma y dimensiones esquemáticas)',
+  'LOG 3 definido':    'Específica (geometría y dimensiones definidas)',
+  'LOG 4 detallado':   'Detallada para fabricación y montaje',
+  'LOG 5 construido':  'Tal como construido (as-built verificado)',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -162,10 +172,10 @@ function conditionalList(condition: string | undefined, value: string | undefine
   return formatList(value);
 }
 
-function resolveLodLevel(hasLod: string | undefined, value: string | undefined): string {
-  if (hasLod !== 'Sí') return 'No aplica';
+function resolveGeometric(hasLoin: string | undefined, value: string | undefined): string {
+  if (hasLoin !== 'Sí') return 'No aplica';
   if (!value) return 'No aplica';
-  return LOD_LEVELS[value] || value;
+  return GEOMETRIC_LEVELS[value] || value;
 }
 
 export function mapAnswersToVars(
@@ -220,8 +230,10 @@ export function mapAnswersToVars(
     classification_system: m['OIR-4.2'] || 'No aplica',
     has_cde:               m['OIR-4.3'] || 'No aplica',
     cde_platform:          conditional(m['OIR-4.3'], m['OIR-4.4']),
-    has_lod:               boolText(m['OIR-4.5']),
-    lod_level:             resolveLodLevel(m['OIR-4.5'], m['OIR-4.6']),
+    has_loin:              boolText(m['OIR-4.5']),
+    loin_geometric:        resolveGeometric(m['OIR-4.5'], m['OIR-4.6']),
+    loin_alphanumeric_list: conditionalList(m['OIR-4.5'], m['OIR-4.7']),
+    loin_documentation_list: conditionalList(m['OIR-4.5'], m['OIR-4.8']),
     // Block 5
     update_frequency:    m['OIR-5.1'] || 'No aplica',
     has_security:        boolText(m['OIR-5.2']),

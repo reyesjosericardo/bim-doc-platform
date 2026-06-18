@@ -8,14 +8,18 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        // Incoestructura — forest/sage scale
         brand: {
-          50:  '#eff6ff',
-          100: '#dbeafe',
-          500: '#3b82f6',
-          600: '#2563eb',
-          700: '#1d4ed8',
-          800: '#1e40af',
-          900: '#1e3a8a',
+          50:  '#f0f3ee',
+          100: '#dde6d9',
+          200: '#c2d2bd',
+          300: '#a9c3a6',
+          400: '#8fa88e',
+          500: '#6b8068',
+          600: '#2e5b3c',
+          700: '#244a30',
+          800: '#1b2a1f',
+          900: '#141b16',
         },
       },
       fontFamily: {

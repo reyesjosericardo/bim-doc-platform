@@ -34,9 +34,10 @@ export interface EIRTemplateVars {
   requires_software: string;
   software_versions: string;
   requires_cobie: string;
-  // Block 5 — LOIN
-  loin_level: string;
-  loin_components_list: string;
+  // Block 5 — LOIN (EN 17412-1)
+  loin_geometric: string;
+  loin_alphanumeric_list: string;
+  loin_documentation_list: string;
   loin_by_discipline: string;
   loin_disciplines_list: string;
   // Block 6 — CDE y gobernanza
@@ -50,14 +51,21 @@ export interface EIRTemplateVars {
 
 type AnswerRow = { question_id: string; answer_value: string };
 
-// ─── LOIN levels (ISO 19650-1 §11.2) ─────────────────────────────────────────
+// ─── LOIN — información geométrica (ISO 19650-1 §11.2 · EN 17412-1) ───────────
 
-const LOIN_LEVELS: Record<string, string> = {
-  nivel_1: 'Nivel 1 — Representación conceptual',
-  nivel_2: 'Nivel 2 — Representación genérica',
-  nivel_3: 'Nivel 3 — Representación específica',
-  nivel_4: 'Nivel 4 — Representación detallada',
-  nivel_5: 'Nivel 5 — Representación construida',
+const GEOMETRIC_LEVELS: Record<string, string> = {
+  simbolico:   'Simbólica / 2D (sin geometría 3D significativa)',
+  conceptual:  'Conceptual (masa o volumen aproximado)',
+  generico:    'Genérica (forma y dimensiones esquemáticas)',
+  especifico:  'Específica (geometría y dimensiones definidas)',
+  fabricacion: 'Detallada para fabricación y montaje',
+  construido:  'Tal como construido (as-built verificado)',
+  // backward compatibility — escala numérica previa
+  nivel_1: 'Conceptual (masa o volumen aproximado)',
+  nivel_2: 'Genérica (forma y dimensiones esquemáticas)',
+  nivel_3: 'Específica (geometría y dimensiones definidas)',
+  nivel_4: 'Detallada para fabricación y montaje',
+  nivel_5: 'Tal como construido (as-built verificado)',
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -86,9 +94,9 @@ function text(value: string | undefined, fallback = 'No aplica'): string {
   return value?.trim() || fallback;
 }
 
-function resolveLoін(value: string | undefined): string {
+function resolveGeometric(value: string | undefined): string {
   if (!value) return 'No aplica';
-  return LOIN_LEVELS[value] || value;
+  return GEOMETRIC_LEVELS[value] || value;
 }
 
 // ─── Main mapper ──────────────────────────────────────────────────────────────
@@ -147,10 +155,11 @@ export function mapEirAnswersToVars(
     requires_cobie:       yesNo(get('EIR-4.6')),
 
     // Block 5
-    loin_level:          resolveLoін(get('EIR-5.1')),
-    loin_components_list: formatList(get('EIR-5.2')),
-    loin_by_discipline:  yesNo(get('EIR-5.3')),
-    loin_disciplines_list: text(conditional('EIR-5.4', 'EIR-5.3'), 'No aplica'),
+    loin_geometric:          resolveGeometric(get('EIR-5.1')),
+    loin_alphanumeric_list:  formatList(get('EIR-5.2')),
+    loin_documentation_list: formatList(get('EIR-5.3')),
+    loin_by_discipline:      yesNo(get('EIR-5.4')),
+    loin_disciplines_list:   text(conditional('EIR-5.5', 'EIR-5.4'), 'No aplica'),
 
     // Block 6
     client_provides_cde:    yesNo(get('EIR-6.1')),

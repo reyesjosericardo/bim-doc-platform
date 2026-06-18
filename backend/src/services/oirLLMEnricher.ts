@@ -107,7 +107,7 @@ DATOS DEL ADJUDICADOR:
 - Formatos de intercambio: ${v.exchange_formats_list}
 - Sistema de clasificación: ${v.classification_system}
 - CDE: ${v.has_cde}${v.has_cde === 'Sí' ? ` — ${v.cde_platform}` : ''}
-- Nivel de información necesario: ${v.has_lod}${v.has_lod === 'Sí' ? ` — ${v.lod_level}` : ''}
+- Nivel de información necesario (LOIN): ${v.has_loin}${v.has_loin === 'Sí' ? ` — geométrica: ${v.loin_geometric}; alfanumérica: ${v.loin_alphanumeric_list}; documental: ${v.loin_documentation_list}` : ''}
 - Frecuencia de actualización: ${v.update_frequency}
 - Restricciones de seguridad: ${v.has_security}${v.has_security === 'Sí' ? ` — ${v.security_types_list}` : ''}
 - Política de retención: ${v.retention_policy}
@@ -130,7 +130,7 @@ INSTRUCCIONES POR CAMPO:
 - s5_1_formatos: Justifica los formatos de intercambio seleccionados (${v.exchange_formats_list}) en términos de interoperabilidad y flujo de trabajo de contenedores según ISO 19650-1 §11.
 - s5_2_clasificacion: Explica el rol del sistema de clasificación (${v.classification_system}) en la identificación unívoca de contenedores de información.
 - s5_3_cde: ${v.has_cde === 'Sí' ? `Fundamenta cómo el CDE ${v.cde_platform} implementa los estados de flujo del contenedor de información según ISO 19650-2 §5.6.` : 'Fundamenta la necesidad futura de implementar un entorno común de datos (CDE) para la gestión del ciclo de vida del AIM.'}
-- s5_4_nivel_info: Establece el ${v.has_lod === 'Sí' ? v.lod_level : 'nivel de información necesario a definir'} como umbral de completitud para los intercambios de información en cada punto clave de decisión, según ISO 19650-1 §11.2.
+- s5_4_nivel_info: Describe el nivel de información necesario (LOIN) requerido por la organización según ISO 19650-1 §11.2 y EN 17412-1, articulándolo en sus tres componentes${v.has_loin === 'Sí' ? `: información geométrica (${v.loin_geometric}), información alfanumérica (${v.loin_alphanumeric_list}) y documentación asociada (${v.loin_documentation_list})` : ' (geométrica, alfanumérica y documental, a definir)'}. Recalca que el detalle debe ser el necesario para el propósito, sin exceso. 3-5 oraciones.
 - s6_1_frecuencia: Justifica la frecuencia de actualización (${v.update_frequency}) del AIM en relación con los eventos desencadenantes de intercambio de información.
 - s6_2_seguridad: ${v.has_security === 'Sí' ? `Establece el marco de control de acceso para los contenedores de información con restricciones: ${v.security_types_list}.` : 'Enmarca los principios de acceso controlado a los contenedores de información según ISO 19650-1 §5.3.'}
 - s6_3_retencion: Justifica la política de retención (${v.retention_policy}) para la continuidad del AIM a largo plazo conforme a los principios de ISO 19650-1.
