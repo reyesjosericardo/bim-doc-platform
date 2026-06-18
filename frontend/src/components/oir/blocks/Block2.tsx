@@ -89,10 +89,10 @@ export function Block2({ answers, onChange }: Props) {
       {/* OIR-2.1 — BIM Uses (Penn State framework) */}
       <div>
         <label className="label">
-          OIR-2.1 Usos BIM requeridos <span className="text-red-500 ml-0.5">*</span>
+          OIR-2.1 Usos BIM de interés estratégico para la organización <span className="text-red-500 ml-0.5">*</span>
         </label>
         <p className="text-xs text-gray-500 mb-1">
-          Según el framework BIM Uses de Penn State. Pasa el cursor sobre cada uso para ver el nombre en inglés.
+          Usos BIM que la organización prioriza a nivel estratégico (se concretarán por proyecto en el EIR). Marco de referencia: BIM Uses de Penn State. Pasa el cursor sobre cada uso para ver el nombre en inglés.
         </p>
         {totalSelected > 0 && (
           <p className="text-xs font-medium text-brand-700 mb-3">
@@ -144,7 +144,7 @@ export function Block2({ answers, onChange }: Props) {
 
       <TextField
         id="OIR-2.2"
-        label="OIR-2.2 Objetivo estratégico principal"
+        label="OIR-2.2 Objetivo estratégico principal al que debe dar respuesta la información"
         required
         type="textarea"
         maxLength={500}
@@ -164,7 +164,7 @@ export function Block2({ answers, onChange }: Props) {
         <div className="pl-4 border-l-2 border-brand-200 bg-brand-50 rounded-r-lg p-4">
           <SelectField
             id="OIR-2.4"
-            label="OIR-2.4 Norma del plan de gestión"
+            label="OIR-2.4 Norma de referencia del plan de gestión de activos"
             options={NORMA_PLAN_OPTIONS}
             answers={answers}
             onChange={onChange}
@@ -174,7 +174,7 @@ export function Block2({ answers, onChange }: Props) {
 
       <BooleanField
         id="OIR-2.5"
-        label="OIR-2.5 ¿Existen obligaciones regulatorias?"
+        label="OIR-2.5 ¿Existen obligaciones regulatorias o normativas aplicables?"
         required
         answers={answers}
         onChange={onChange}

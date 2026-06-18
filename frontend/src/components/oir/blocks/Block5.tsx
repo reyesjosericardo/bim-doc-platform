@@ -45,7 +45,7 @@ export function Block5({ answers, onChange }: Props) {
 
       <SelectField
         id="OIR-5.1"
-        label="OIR-5.1 Frecuencia de actualización del modelo"
+        label="OIR-5.1 Frecuencia de actualización de la información"
         required
         options={FRECUENCIA_OPTIONS}
         answers={answers}

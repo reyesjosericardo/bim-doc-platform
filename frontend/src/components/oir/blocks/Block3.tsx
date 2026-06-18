@@ -56,8 +56,8 @@ export function Block3({ answers, onChange }: Props) {
   return (
     <div className="space-y-6">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">Bloque 3 — Requisitos del activo</h2>
-        <p className="text-sm text-gray-500 mt-1">Información para gestión del ciclo de vida (OIR-3.1 a OIR-3.7)</p>
+        <h2 className="text-xl font-semibold text-gray-900">Bloque 3 — Necesidades de información para la gestión de activos</h2>
+        <p className="text-sm text-gray-500 mt-1">Información que la organización necesita a lo largo del ciclo de vida del activo (OIR-3.1 a OIR-3.7)</p>
       </div>
 
       <MultiSelectField
@@ -100,7 +100,7 @@ export function Block3({ answers, onChange }: Props) {
 
       <MultiSelectField
         id="OIR-3.5"
-        label="OIR-3.5 Impactos a gestionar"
+        label="OIR-3.5 Impactos ambientales y operativos a gestionar"
         required
         options={IMPACTOS_OPTIONS}
         answers={answers}
