@@ -7,7 +7,7 @@ interface Props {
   documentId: string;
   status: DocumentStatus;
   answeredCount: number;
-  docType?: 'OIR' | 'EIR';
+  docType?: 'OIR' | 'EIR' | 'BEP';
 }
 
 type DocMode = 'complete' | 'narrative_only';
@@ -43,9 +43,10 @@ export function GenerateDocumentButton({ documentId, status, answeredCount, docT
   const [error, setError] = useState('');
 
   const docTypeLower = docType.toLowerCase();
-  const minAnswers = docType === 'EIR' ? 20 : 20;
+  const minAnswers = 20;
   const isReady = status === 'aprobado' && answeredCount >= minAnswers;
-  const isEIR = docType === 'EIR';
+  // EIR and BEP share a single-document flow (no executive version like OIR)
+  const isSingle = docType !== 'OIR';
 
   async function handleGenerate(mode: DocMode) {
     setGenerating(mode);
@@ -55,7 +56,7 @@ export function GenerateDocumentButton({ documentId, status, answeredCount, docT
       const res = await fetch(`/api/documents/${docTypeLower}/${documentId}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(isEIR ? {} : { mode }),
+        body: JSON.stringify(isSingle ? {} : { mode }),
       });
 
       if (!res.ok) {
@@ -63,7 +64,7 @@ export function GenerateDocumentButton({ documentId, status, answeredCount, docT
         throw new Error(body.error || 'Error al generar el documento');
       }
 
-      if (isEIR) {
+      if (isSingle) {
         const links: GeneratedLinks = {
           docxUrl: `/api/documents/${docTypeLower}/${documentId}/download/docx`,
           pdfUrl:  `/api/documents/${docTypeLower}/${documentId}/download/pdf`,
@@ -102,15 +103,18 @@ export function GenerateDocumentButton({ documentId, status, answeredCount, docT
     );
   }
 
-  // EIR: single generate button (no executive version)
-  if (isEIR) {
+  // EIR / BEP: single generate button (no executive version)
+  if (isSingle) {
+    const singleDesc = docType === 'BEP'
+      ? 'Plan de Ejecución BIM con todas las secciones ISO 19650-2 y narrativas profesionales.'
+      : 'Pliego BIM con todas las secciones ISO 19650-2 y narrativas contractuales.';
     return (
       <div className="space-y-4">
         <div className="rounded-lg border border-gray-200 p-4 space-y-3">
           <div>
-            <p className="text-sm font-semibold text-gray-900">Documento EIR completo</p>
+            <p className="text-sm font-semibold text-gray-900">Documento {docType} completo</p>
             <p className="text-xs text-gray-500 mt-0.5">
-              Pliego BIM con todas las secciones ISO 19650-2 y narrativas contractuales.
+              {singleDesc}
             </p>
           </div>
           {!completeLinks ? (
@@ -125,13 +129,13 @@ export function GenerateDocumentButton({ documentId, status, answeredCount, docT
                   Generando...
                 </>
               ) : (
-                <>{DOC_ICON} Generar documento EIR</>
+                <>{DOC_ICON} Generar documento {docType}</>
               )}
             </button>
           ) : (
             <div className="space-y-2">
               <p className="text-xs font-medium text-green-700 flex items-center gap-1.5">
-                {CHECK_ICON} Documento EIR generado
+                {CHECK_ICON} Documento {docType} generado
               </p>
               <div className="flex gap-2 flex-wrap">
                 <a href={completeLinks.docxUrl} download className="btn-primary text-xs py-1.5 flex items-center gap-1.5">
