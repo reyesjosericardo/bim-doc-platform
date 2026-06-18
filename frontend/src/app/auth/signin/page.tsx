@@ -4,6 +4,20 @@ import { useState } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
+function CubeMark({ className = '' }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 200 200" className={className} aria-hidden role="img">
+      <path d="M 100 30 L 160 65 L 100 100 L 40 65 Z" fill="#EEE9DB" />
+      <path d="M 40 65 L 100 100 L 100 170 L 40 135 Z" fill="#8FA88E" />
+      <path d="M 100 100 L 160 65 L 160 135 L 100 170 Z" fill="#6B8068" />
+    </svg>
+  );
+}
+
+const inputCls =
+  'w-full rounded-[4px] bg-[#EEE9DB]/[0.03] border border-[#EEE9DB]/15 px-3 py-2.5 text-sm text-[#EEE9DB] placeholder-[#EEE9DB]/30 focus:border-[#8FA88E]/60 focus:outline-none focus:ring-1 focus:ring-[#8FA88E]/40 transition';
+const labelCls = 'block font-code text-[10px] tracking-[0.18em] uppercase text-[#8FA88E]/70 mb-1.5';
+
 export default function SignInPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -32,60 +46,70 @@ export default function SignInPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-brand-800 to-brand-900 px-4">
-      <div className="w-full max-w-md">
+    <div className="bp-canvas min-h-screen flex items-center justify-center px-4 relative">
+      <div className="brand-grid fixed inset-0 pointer-events-none" />
+
+      <div className="w-full max-w-md relative">
+        {/* Brand header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/10 mb-4">
-            <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
+          <CubeMark className="w-14 h-14 mx-auto mb-5" />
+          <h1 className="font-display text-[1.75rem] tracking-[0.13em] text-[#EEE9DB]">INCOESTRUCTURA</h1>
+          <div className="flex items-center justify-center gap-2.5 mt-2">
+            <span className="font-code text-[10px] text-[#8FA88E]/70 tracking-[0.22em] uppercase">BIM·Doc</span>
+            <span className="h-3 w-px bg-[#EEE9DB]/15" />
+            <span className="font-code text-[10px] text-[#EEE9DB]/40 tracking-[0.18em] uppercase">ISO 19650</span>
           </div>
-          <h1 className="text-3xl font-bold text-white">BIM Doc Platform</h1>
-          <p className="text-brand-200 mt-1 text-sm">Gestión de documentos BIM ISO 19650</p>
         </div>
 
-        <div className="card">
-          <h2 className="text-xl font-semibold text-gray-900 mb-6">Iniciar sesión</h2>
+        {/* Sign-in panel */}
+        <div className="bp-panel p-7">
+          <div className="flex items-center gap-3 mb-6">
+            <span className="bp-eyebrow">Acceso</span>
+            <span className="bp-rule flex-1" />
+          </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label htmlFor="email" className="label">Email</label>
+              <label htmlFor="email" className={labelCls}>Email</label>
               <input
                 id="email"
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="input-field"
+                className={inputCls}
                 placeholder="tu@organizacion.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="label">Contraseña</label>
+              <label htmlFor="password" className={labelCls}>Contraseña</label>
               <input
                 id="password"
                 type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="input-field"
+                className={inputCls}
                 placeholder="••••••••"
               />
             </div>
 
             {error && (
-              <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
+              <div className="rounded-[4px] bg-[#B5805E]/10 border border-[#B5805E]/30 px-4 py-3 text-sm text-[#D8A98C]">
                 {error}
               </div>
             )}
 
-            <button type="submit" disabled={loading} className="btn-primary w-full">
-              {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
+            <button type="submit" disabled={loading} className="btn-cta-lg w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed">
+              {loading ? 'Iniciando sesión…' : 'Iniciar sesión'}
             </button>
           </form>
         </div>
+
+        <p className="text-center font-code text-[10px] text-[#EEE9DB]/30 mt-6 tracking-wide">
+          Plataforma documental BIM · ISO 19650-1 / 19650-2
+        </p>
       </div>
     </div>
   );

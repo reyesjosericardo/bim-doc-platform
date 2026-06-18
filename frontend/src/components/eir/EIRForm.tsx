@@ -5,6 +5,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { ProgressBar } from '../ui/ProgressBar';
 import { StatusBadge } from '../ui/StatusBadge';
+import { CubeMark } from '../ui/CubeMark';
 import { GenerateDocumentButton } from '../oir/GenerateDocumentButton';
 import { Block1 } from './blocks/Block1';
 import { Block2 } from './blocks/Block2';
@@ -21,24 +22,24 @@ const REQUIRED_BY_BLOCK: Record<number, string[]> = {
   1: [],
   2: ['EIR-3.1', 'EIR-3.2', 'EIR-3.3', 'EIR-3.5'],
   3: ['EIR-4.1', 'EIR-4.2', 'EIR-4.3', 'EIR-4.4', 'EIR-4.6'],
-  4: ['EIR-5.1', 'EIR-5.2', 'EIR-5.3'],
+  4: ['EIR-5.1', 'EIR-5.2', 'EIR-5.3', 'EIR-5.4'],
   5: ['EIR-6.1', 'EIR-6.3', 'EIR-6.4', 'EIR-6.5'],
 };
 
 const CONDITIONAL_TRIGGERS: Record<string, string> = {
   'EIR-3.4': 'EIR-3.3',
   'EIR-4.5': 'EIR-4.4',
-  'EIR-5.4': 'EIR-5.3',
+  'EIR-5.5': 'EIR-5.4',
   'EIR-6.2': 'EIR-6.1',
   'EIR-6.6': 'EIR-6.5',
 };
 
-const BASE_COUNT = 26;
+const BASE_COUNT = 27;
 
 function inferAnswerType(questionId: string): string {
   const textarea = ['EIR-1.2', 'EIR-2.5', 'EIR-4.5', 'EIR-6.6'];
-  const boolean = ['EIR-2.1', 'EIR-2.2', 'EIR-2.3', 'EIR-2.4', 'EIR-3.2', 'EIR-3.3', 'EIR-4.4', 'EIR-4.6', 'EIR-5.3', 'EIR-6.1', 'EIR-6.4', 'EIR-6.5'];
-  const multi = ['EIR-1.4', 'EIR-3.1', 'EIR-4.3', 'EIR-5.2', 'EIR-5.4', 'EIR-6.3'];
+  const boolean = ['EIR-2.1', 'EIR-2.2', 'EIR-2.3', 'EIR-2.4', 'EIR-3.2', 'EIR-3.3', 'EIR-4.4', 'EIR-4.6', 'EIR-5.4', 'EIR-6.1', 'EIR-6.4', 'EIR-6.5'];
+  const multi = ['EIR-1.4', 'EIR-3.1', 'EIR-4.3', 'EIR-5.2', 'EIR-5.3', 'EIR-5.5', 'EIR-6.3'];
   const select = ['EIR-1.3', 'EIR-3.4', 'EIR-3.5', 'EIR-4.1', 'EIR-4.2', 'EIR-5.1', 'EIR-6.2'];
   if (textarea.includes(questionId)) return 'textarea';
   if (boolean.includes(questionId)) return 'boolean';
@@ -172,14 +173,18 @@ export function EIRForm({ documentId, projectId, initialAnswers = {}, initialSta
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold text-gray-900">EIR — Requisitos de Intercambio de Información</h1>
-            <p className="text-xs text-gray-500">ISO 19650-2 — Pliego BIM</p>
+    <div className="bp-canvas min-h-screen relative">
+      <div className="brand-grid fixed inset-0 pointer-events-none" />
+      <div className="sticky top-0 z-10 border-b border-[#EEE9DB]/[0.07] bg-[#141B16]/90 backdrop-blur-xl">
+        <div className="max-w-3xl mx-auto px-4 py-3.5 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <CubeMark className="w-7 h-7 flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="font-display text-[15px] text-[#EEE9DB] leading-tight truncate">EIR — Requisitos de Intercambio de Información</h1>
+              <p className="font-code text-[10px] text-[#8FA88E]/70 tracking-wider uppercase">Incoestructura · ISO 19650-2 · Pliego BIM</p>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-shrink-0">
             <StatusBadge status={status} />
             {canApprove && status === 'en_revision' && (
               <button onClick={() => handleStatusChange('aprobado')} className="btn-primary text-xs py-1">Aprobar</button>

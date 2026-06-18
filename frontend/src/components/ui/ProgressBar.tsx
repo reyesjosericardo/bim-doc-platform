@@ -25,13 +25,13 @@ export function ProgressBar({ current, total, blocks, activeBlock, onBlockClick 
                   active
                     ? 'bg-brand-600 text-white shadow-sm'
                     : done
-                    ? 'bg-brand-100 text-brand-700 hover:bg-brand-200 cursor-pointer'
-                    : 'bg-gray-100 text-gray-400 cursor-default'
+                    ? 'bg-brand-400/20 text-brand-300 hover:bg-brand-400/30 cursor-pointer'
+                    : 'bg-[#EEE9DB]/[0.07] text-[#EEE9DB]/40 cursor-default'
                 }`}
                 disabled={!done && !active}
               >
                 <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
-                  active ? 'bg-white text-brand-700' : done ? 'bg-brand-600 text-white' : 'bg-gray-300 text-gray-500'
+                  active ? 'bg-white text-brand-600' : done ? 'bg-brand-500 text-white' : 'bg-[#EEE9DB]/12 text-[#EEE9DB]/50'
                 }`}>
                   {done ? (
                     <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
@@ -44,7 +44,7 @@ export function ProgressBar({ current, total, blocks, activeBlock, onBlockClick 
                 <span className="hidden sm:inline">{label}</span>
               </button>
               {i < blocks.length - 1 && (
-                <div className={`w-6 sm:w-12 h-0.5 mx-1 flex-shrink-0 ${done ? 'bg-brand-400' : 'bg-gray-200'}`} />
+                <div className={`w-6 sm:w-12 h-0.5 mx-1 flex-shrink-0 ${done ? 'bg-brand-400' : 'bg-[#EEE9DB]/12'}`} />
               )}
             </div>
           );
@@ -53,14 +53,14 @@ export function ProgressBar({ current, total, blocks, activeBlock, onBlockClick 
 
       {/* Overall progress bar */}
       <div className="flex items-center gap-3">
-        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+        <div className="flex-1 h-2 bg-[#EEE9DB]/12 rounded-full overflow-hidden">
           <div
-            className="h-full bg-brand-500 rounded-full transition-all duration-300"
+            className="h-full bg-brand-400 rounded-full transition-all duration-300"
             style={{ width: `${pct}%` }}
           />
         </div>
-        <span className="text-xs font-medium text-gray-500 w-16 text-right">
-          {current}/{total} resp.
+        <span className="font-code text-xs text-[#EEE9DB]/55 w-16 text-right">
+          {current}/{total}
         </span>
       </div>
     </div>
