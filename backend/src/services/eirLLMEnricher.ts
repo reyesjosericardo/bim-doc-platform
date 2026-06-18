@@ -85,8 +85,9 @@ ESTÁNDARES DE INFORMACIÓN:
 - COBie para O&M: ${v.requires_cobie}
 
 LOIN (NIVEL DE INFORMACIÓN NECESARIO):
-- Nivel mínimo: ${v.loin_level}
-- Componentes: ${v.loin_components_list}
+- Información geométrica: ${v.loin_geometric}
+- Información alfanumérica: ${v.loin_alphanumeric_list}
+- Documentación asociada: ${v.loin_documentation_list}
 - LOIN por disciplina: ${v.loin_by_discipline}${v.loin_by_discipline === 'Sí' ? ` — ${v.loin_disciplines_list}` : ''}
 
 CDE Y GOBERNANZA:
@@ -103,8 +104,8 @@ INSTRUCCIONES POR CAMPO:
 - s4_1_nomenclatura: Establece el sistema de nomenclatura de archivos (${v.naming_system}) y el sistema de clasificación (${v.classification_system}) como requisitos obligatorios para la identificación unívoca de contenedores de información. 3-4 oraciones.
 - s4_2_formatos: Define los formatos de intercambio de información requeridos (${v.exchange_formats_list}) y el requisito de COBie para O&M (${v.requires_cobie}). Establece que el IFC es el formato neutral de archivado para el AIM. 3-4 oraciones.
 - s4_3_software: ${v.requires_software === 'Sí' ? `Establece las versiones de software requeridas: ${v.software_versions}. Justifica estos requisitos en términos de interoperabilidad y compatibilidad con el CDE del adjudicador. 3-4 oraciones.` : 'El adjudicador no establece requisitos de versión de software específica, dejando a criterio del adjudicatario principal la selección de herramientas, siempre que se garantice la entrega de contenedores de información en los formatos especificados. 3-4 oraciones.'}
-- s5_1_nivel: Establece el ${v.loin_level} como nivel mínimo de información necesario para todos los intercambios de información en puntos clave de decisión, conforme a ISO 19650-1 §11.2 y EN17412-1. Describe las implicaciones contractuales del incumplimiento. 3-5 oraciones.
-- s5_2_componentes: Describe los componentes de información requeridos (${v.loin_components_list}) según la estructura LOIN: geométrico, datos alfanuméricos y fichas técnicas. Establece qué debe incluir cada componente en los contenedores de información. 3-4 oraciones.
+- s5_1_nivel: Establece el nivel de información necesario (LOIN) requerido, comenzando por la información geométrica (${v.loin_geometric}) como umbral para todos los intercambios en puntos clave de decisión, conforme a ISO 19650-1 §11.2 y EN17412-1. Recalca que el detalle debe ser el necesario para el propósito, sin exceso, y describe las implicaciones contractuales del incumplimiento. 3-5 oraciones.
+- s5_2_componentes: Describe la información alfanumérica requerida (${v.loin_alphanumeric_list}) y la documentación asociada exigida (${v.loin_documentation_list}) como componentes del LOIN según EN 17412-1, además de la geométrica. Establece qué debe incluir cada componente en los contenedores de información. 3-4 oraciones.
 - s5_3_disciplinas: ${v.loin_by_discipline === 'Sí' ? `El adjudicador establece requisitos LOIN diferenciados para las siguientes disciplinas: ${v.loin_disciplines_list}. Justifica esta diferenciación por la complejidad técnica de cada disciplina. 3-4 oraciones.` : 'El adjudicador establece un nivel de información necesario uniforme para todas las disciplinas del proyecto, simplificando la coordinación entre equipos de trabajo. Los adjudicatarios principales deberán aplicar este nivel a todos los contenedores de información intercambiados. 3-4 oraciones.'}
 - s6_1_cde: ${v.client_provides_cde === 'Sí' ? `El adjudicador provee el entorno común de datos (CDE) mediante la plataforma ${v.cde_platform} como infraestructura tecnológica del proyecto. Establece que todos los intercambios de información deben realizarse a través del CDE. 3-4 oraciones.` : 'El adjudicatario principal será responsable de establecer y gestionar el entorno común de datos (CDE) para el proyecto, garantizando el acceso del adjudicador a la zona COMPARTIDO. El CDE deberá implementar los estados de flujo de información requeridos por ISO 19650-2 §5.6. 3-4 oraciones.'}
 - s6_2_estados: Establece los estados de flujo de información requeridos en el CDE (${v.cde_states_list}) y la obligatoriedad de la estructura de carpetas ISO 19650 (${v.requires_iso_folders}). Define el protocolo de transición entre estados y las responsabilidades de validación. 3-4 oraciones.

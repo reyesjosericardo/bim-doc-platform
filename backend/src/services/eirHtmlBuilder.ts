@@ -171,14 +171,16 @@ export function buildEirHtml(vars: EIREnrichedVars): string {
   <h2>5. Nivel de información necesario (LOIN)</h2>
   <p><em>Referencia normativa: ISO 19650-1 §11.2 y EN17412-1 — Nivel de información necesaria</em></p>
 
-  <h3>5.1 Nivel mínimo requerido</h3>
+  <h3>5.1 Información geométrica requerida</h3>
   ${nar(vars.s5_1_nivel)}
-  ${kv('Nivel mínimo de información necesario', vars.loin_level)}
+  ${kv('Nivel de información geométrica', vars.loin_geometric)}
 
-  <h3>5.2 Componentes de información requeridos</h3>
+  <h3>5.2 Información alfanumérica y documental requerida</h3>
   ${nar(vars.s5_2_componentes)}
-  <p><strong>Componentes requeridos:</strong></p>
-  ${nl2li(vars.loin_components_list)}
+  <p><strong>Información alfanumérica:</strong></p>
+  ${nl2li(vars.loin_alphanumeric_list)}
+  <p><strong>Documentación asociada:</strong></p>
+  ${nl2li(vars.loin_documentation_list)}
 
   ${vars.loin_by_discipline === 'Sí' ? `
   <h3>5.3 LOIN diferenciado por disciplina</h3>

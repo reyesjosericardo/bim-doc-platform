@@ -290,15 +290,17 @@ export async function buildEirDocx(vars: EIREnrichedVars): Promise<Buffer> {
   children.push(body('Referencia normativa: ISO 19650-1 §11.2 y EN17412-1 — Nivel de información necesaria', { italic: true }));
 
   // 5.1
-  children.push(h3('5.1 Nivel mínimo requerido'));
+  children.push(h3('5.1 Información geométrica requerida'));
   children.push(...nar(vars.s5_1_nivel));
-  children.push(...kv('Nivel mínimo de información necesario', vars.loin_level));
+  children.push(...kv('Nivel de información geométrica', vars.loin_geometric));
 
   // 5.2
-  children.push(h3('5.2 Componentes de información requeridos'));
+  children.push(h3('5.2 Información alfanumérica y documental requerida'));
   children.push(...nar(vars.s5_2_componentes));
-  children.push(...kv('Componentes requeridos', ''));
-  children.push(...multilineBody(vars.loin_components_list));
+  children.push(...kv('Información alfanumérica', ''));
+  children.push(...multilineBody(vars.loin_alphanumeric_list));
+  children.push(...kv('Documentación asociada', ''));
+  children.push(...multilineBody(vars.loin_documentation_list));
 
   // 5.3
   if (vars.loin_by_discipline === 'Sí') {

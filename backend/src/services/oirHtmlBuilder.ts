@@ -302,12 +302,18 @@ export function buildOirHtml(vars: OIREnrichedVars, mode: DocMode = 'complete'):
   </div>
 
   <div class="subsection">
-    <h3>5.4 Nivel de información necesario</h3>
+    <h3>5.4 Nivel de información necesario (LOIN)</h3>
     ${nar(vars.s5_4_nivel_info)}
     ${data(mode, `
-      <p class="footnote">Referencia normativa: ISO 19650-1 §11.2</p>
-      ${kv('¿Nivel de información necesario definido?', vars.has_lod)}
-      ${vars.has_lod === 'Sí' ? kv('Nivel mínimo requerido', vars.lod_level) : ''}
+      <p class="footnote">Referencia normativa: ISO 19650-1 §11.2 · EN 17412-1</p>
+      ${kv('¿LOIN definido por la organización?', vars.has_loin)}
+      ${vars.has_loin === 'Sí' ? `
+        ${kv('Información geométrica', vars.loin_geometric)}
+        <p><strong>Información alfanumérica:</strong></p>
+        ${nl2li(vars.loin_alphanumeric_list)}
+        <p><strong>Documentación asociada:</strong></p>
+        ${nl2li(vars.loin_documentation_list)}
+      ` : ''}
     `)}
   </div>
 </div>
