@@ -7,7 +7,7 @@ interface Props {
   documentId: string;
   status: DocumentStatus;
   answeredCount: number;
-  docType?: 'OIR' | 'EIR' | 'BEP';
+  docType?: 'OIR' | 'EIR' | 'BEP' | 'AIR' | 'PIR';
 }
 
 type DocMode = 'complete' | 'narrative_only';
@@ -105,9 +105,13 @@ export function GenerateDocumentButton({ documentId, status, answeredCount, docT
 
   // EIR / BEP: single generate button (no executive version)
   if (isSingle) {
-    const singleDesc = docType === 'BEP'
-      ? 'Plan de Ejecución BIM con todas las secciones ISO 19650-2 y narrativas profesionales.'
-      : 'Pliego BIM con todas las secciones ISO 19650-2 y narrativas contractuales.';
+    const singleDescMap: Record<string, string> = {
+      EIR: 'Pliego BIM con todas las secciones ISO 19650-2 y narrativas contractuales.',
+      BEP: 'Plan de Ejecución BIM con todas las secciones ISO 19650-2 y narrativas profesionales.',
+      AIR: 'Requisitos de Información del Activo con todas las secciones ISO 19650 y narrativas.',
+      PIR: 'Requisitos de Información del Proyecto con todas las secciones ISO 19650 y narrativas.',
+    };
+    const singleDesc = singleDescMap[docType] ?? 'Documento con todas las secciones ISO 19650 y narrativas.';
     return (
       <div className="space-y-4">
         <div className="rounded-lg border border-gray-200 p-4 space-y-3">

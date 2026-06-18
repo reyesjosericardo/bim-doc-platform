@@ -78,6 +78,7 @@ model BimDocument {
 
 enum DocumentType {
   OIR
+  PIR
   AIR
   EIR
   BEP

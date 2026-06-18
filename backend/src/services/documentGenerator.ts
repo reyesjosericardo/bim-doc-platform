@@ -19,6 +19,14 @@ import { mapBepAnswersToVars } from './bepMapper';
 import { enrichBepWithLLM } from './bepLLMEnricher';
 import { buildBepDocx } from './bepWordBuilder';
 import { buildBepHtml } from './bepHtmlBuilder';
+import { mapAirAnswersToVars } from './airMapper';
+import { enrichAirWithLLM } from './airLLMEnricher';
+import { buildAirDocx } from './airWordBuilder';
+import { buildAirHtml } from './airHtmlBuilder';
+import { mapPirAnswersToVars } from './pirMapper';
+import { enrichPirWithLLM } from './pirLLMEnricher';
+import { buildPirDocx } from './pirWordBuilder';
+import { buildPirHtml } from './pirHtmlBuilder';
 
 const prisma = new PrismaClient();
 
@@ -283,6 +291,98 @@ export function getBepGeneratedFilePath(
 ): string {
   const ext = format;
   return path.join(STORAGE_DIR, `${documentId}_BEP_v${version}.${ext}`);
+}
+
+export async function generateAirDocuments(documentId: string): Promise<GeneratedFiles> {
+  const doc = await prisma.bimDocument.findUniqueOrThrow({
+    where: { id: documentId },
+    include: { questionnaire_answers: true, project: { select: { name: true } } },
+  });
+
+  const baseVars = mapAirAnswersToVars(doc.questionnaire_answers, {
+    project_name: doc.project.name,
+    version: doc.version,
+    status: doc.status,
+  });
+  const vars = await enrichAirWithLLM(baseVars);
+
+  await fs.mkdir(STORAGE_DIR, { recursive: true });
+  const baseName = `${documentId}_AIR_v${doc.version}`;
+  const docxPath = path.join(STORAGE_DIR, `${baseName}.docx`);
+  const pdfPath  = path.join(STORAGE_DIR, `${baseName}.pdf`);
+
+  await fs.writeFile(docxPath, await buildAirDocx(vars));
+  await renderHtmlToPdf(buildAirHtml(vars), pdfPath);
+
+  const baseUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+  await prisma.$transaction([
+    prisma.generatedFile.upsert({
+      where:  { id: `${documentId}-air-docx` },
+      update: { file_url: `${baseUrl}/api/documents/air/${documentId}/download/docx`, generated_at: new Date() },
+      create: { id: `${documentId}-air-docx`, document_id: documentId, file_format: 'docx', file_url: `${baseUrl}/api/documents/air/${documentId}/download/docx` },
+    }),
+    prisma.generatedFile.upsert({
+      where:  { id: `${documentId}-air-pdf` },
+      update: { file_url: `${baseUrl}/api/documents/air/${documentId}/download/pdf`, generated_at: new Date() },
+      create: { id: `${documentId}-air-pdf`, document_id: documentId, file_format: 'pdf', file_url: `${baseUrl}/api/documents/air/${documentId}/download/pdf` },
+    }),
+  ]);
+
+  return {
+    docxUrl: `${baseUrl}/api/documents/air/${documentId}/download/docx`,
+    pdfUrl:  `${baseUrl}/api/documents/air/${documentId}/download/pdf`,
+    docxPath, pdfPath,
+  };
+}
+
+export function getAirGeneratedFilePath(documentId: string, version: number, format: 'docx' | 'pdf'): string {
+  return path.join(STORAGE_DIR, `${documentId}_AIR_v${version}.${format}`);
+}
+
+export async function generatePirDocuments(documentId: string): Promise<GeneratedFiles> {
+  const doc = await prisma.bimDocument.findUniqueOrThrow({
+    where: { id: documentId },
+    include: { questionnaire_answers: true, project: { select: { name: true } } },
+  });
+
+  const baseVars = mapPirAnswersToVars(doc.questionnaire_answers, {
+    project_name: doc.project.name,
+    version: doc.version,
+    status: doc.status,
+  });
+  const vars = await enrichPirWithLLM(baseVars);
+
+  await fs.mkdir(STORAGE_DIR, { recursive: true });
+  const baseName = `${documentId}_PIR_v${doc.version}`;
+  const docxPath = path.join(STORAGE_DIR, `${baseName}.docx`);
+  const pdfPath  = path.join(STORAGE_DIR, `${baseName}.pdf`);
+
+  await fs.writeFile(docxPath, await buildPirDocx(vars));
+  await renderHtmlToPdf(buildPirHtml(vars), pdfPath);
+
+  const baseUrl = process.env.BACKEND_URL || 'http://localhost:4000';
+  await prisma.$transaction([
+    prisma.generatedFile.upsert({
+      where:  { id: `${documentId}-pir-docx` },
+      update: { file_url: `${baseUrl}/api/documents/pir/${documentId}/download/docx`, generated_at: new Date() },
+      create: { id: `${documentId}-pir-docx`, document_id: documentId, file_format: 'docx', file_url: `${baseUrl}/api/documents/pir/${documentId}/download/docx` },
+    }),
+    prisma.generatedFile.upsert({
+      where:  { id: `${documentId}-pir-pdf` },
+      update: { file_url: `${baseUrl}/api/documents/pir/${documentId}/download/pdf`, generated_at: new Date() },
+      create: { id: `${documentId}-pir-pdf`, document_id: documentId, file_format: 'pdf', file_url: `${baseUrl}/api/documents/pir/${documentId}/download/pdf` },
+    }),
+  ]);
+
+  return {
+    docxUrl: `${baseUrl}/api/documents/pir/${documentId}/download/docx`,
+    pdfUrl:  `${baseUrl}/api/documents/pir/${documentId}/download/pdf`,
+    docxPath, pdfPath,
+  };
+}
+
+export function getPirGeneratedFilePath(documentId: string, version: number, format: 'docx' | 'pdf'): string {
+  return path.join(STORAGE_DIR, `${documentId}_PIR_v${version}.${format}`);
 }
 
 export function getGeneratedFilePath(

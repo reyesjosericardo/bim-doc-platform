@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { signOut } from 'next-auth/react';
 import Link from 'next/link';
 import type { Session } from 'next-auth';
-import type { OIRWithProgress, EIRWithProgress, BEPWithProgress, Project, DocumentStatus } from '@/types/oir';
+import type { OIRWithProgress, EIRWithProgress, BEPWithProgress, AIRWithProgress, PIRWithProgress, Project, DocumentStatus } from '@/types/oir';
 
 interface Props { session: Session }
 
@@ -19,11 +19,13 @@ function CubeMark({ className = '' }: { className?: string }) {
   );
 }
 
-// ── Per-document identity. Natural-materials triad on-brand with forest + cream:
-//    sage (OIR) · wheat (EIR) · clay (BEP). Accent encodes which ISO 19650 document. ──
-type DocKind = 'OIR' | 'EIR' | 'BEP';
+// ── Per-document identity. Natural-materials palette on-brand with forest + cream.
+//    Accent encodes which ISO 19650 document, in hierarchy order. ──
+type DocKind = 'OIR' | 'PIR' | 'AIR' | 'EIR' | 'BEP';
 const DOC_META: Record<DocKind, { accent: string; full: string; slug: string }> = {
   OIR: { accent: '#8FA88E', full: 'Información organizacional', slug: 'oir' },
+  PIR: { accent: '#B0A98F', full: 'Información del proyecto',   slug: 'pir' },
+  AIR: { accent: '#7C9C95', full: 'Información del activo',     slug: 'air' },
   EIR: { accent: '#C9A86A', full: 'Intercambio de información', slug: 'eir' },
   BEP: { accent: '#B5805E', full: 'Plan de ejecución BIM',      slug: 'bep' },
 };
@@ -39,6 +41,8 @@ interface AnyDoc { id: string; version: number; status: DocumentStatus; progress
 export function DashboardClient({ session }: Props) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [oirsByProject, setOirsByProject] = useState<Record<string, OIRWithProgress[]>>({});
+  const [pirsByProject, setPirsByProject] = useState<Record<string, PIRWithProgress[]>>({});
+  const [airsByProject, setAirsByProject] = useState<Record<string, AIRWithProgress[]>>({});
   const [eirsByProject, setEirsByProject] = useState<Record<string, EIRWithProgress[]>>({});
   const [bepsByProject, setBepsByProject] = useState<Record<string, BEPWithProgress[]>>({});
   const [loading, setLoading] = useState(true);
@@ -52,21 +56,29 @@ export function DashboardClient({ session }: Props) {
           setProjects(data);
 
           const oirMap: Record<string, OIRWithProgress[]> = {};
+          const pirMap: Record<string, PIRWithProgress[]> = {};
+          const airMap: Record<string, AIRWithProgress[]> = {};
           const eirMap: Record<string, EIRWithProgress[]> = {};
           const bepMap: Record<string, BEPWithProgress[]> = {};
           await Promise.all(
             data.map(async (p) => {
-              const [oirRes, eirRes, bepRes] = await Promise.all([
+              const [oirRes, pirRes, airRes, eirRes, bepRes] = await Promise.all([
                 fetch(`/api/projects/${p.id}/oir`),
+                fetch(`/api/projects/${p.id}/pir`),
+                fetch(`/api/projects/${p.id}/air`),
                 fetch(`/api/projects/${p.id}/eir`),
                 fetch(`/api/projects/${p.id}/bep`),
               ]);
               if (oirRes.ok) oirMap[p.id] = await oirRes.json();
+              if (pirRes.ok) pirMap[p.id] = await pirRes.json();
+              if (airRes.ok) airMap[p.id] = await airRes.json();
               if (eirRes.ok) eirMap[p.id] = await eirRes.json();
               if (bepRes.ok) bepMap[p.id] = await bepRes.json();
             })
           );
           setOirsByProject(oirMap);
+          setPirsByProject(pirMap);
+          setAirsByProject(airMap);
           setEirsByProject(eirMap);
           setBepsByProject(bepMap);
         }
@@ -130,7 +142,7 @@ export function DashboardClient({ session }: Props) {
               Proyectos
             </h1>
             <p className="font-code text-xs text-[#EEE9DB]/45 tracking-wide pb-1">
-              {loading ? '— cargando —' : `${projects.length} ${projects.length === 1 ? 'proyecto' : 'proyectos'} · flujo OIR → EIR → BEP`}
+              {loading ? '— cargando —' : `${projects.length} ${projects.length === 1 ? 'proyecto' : 'proyectos'} · flujo OIR → PIR → AIR → EIR → BEP`}
             </p>
           </div>
           <div className="bp-rule mt-5" />
@@ -148,6 +160,8 @@ export function DashboardClient({ session }: Props) {
                 index={i}
                 project={project}
                 oirs={oirsByProject[project.id] ?? []}
+                pirs={pirsByProject[project.id] ?? []}
+                airs={airsByProject[project.id] ?? []}
                 eirs={eirsByProject[project.id] ?? []}
                 beps={bepsByProject[project.id] ?? []}
               />
@@ -159,8 +173,9 @@ export function DashboardClient({ session }: Props) {
   );
 }
 
-function ProjectDossier({ index, project, oirs, eirs, beps }: {
-  index: number; project: Project; oirs: OIRWithProgress[]; eirs: EIRWithProgress[]; beps: BEPWithProgress[];
+function ProjectDossier({ index, project, oirs, pirs, airs, eirs, beps }: {
+  index: number; project: Project;
+  oirs: OIRWithProgress[]; pirs: PIRWithProgress[]; airs: AIRWithProgress[]; eirs: EIRWithProgress[]; beps: BEPWithProgress[];
 }) {
   const code = `P-${String(index + 1).padStart(2, '0')}`;
   const isActive = project.status === 'active';
@@ -188,9 +203,13 @@ function ProjectDossier({ index, project, oirs, eirs, beps }: {
         </span>
       </div>
 
-      {/* ── Document pipeline (signature) ── */}
-      <div className="flex flex-col md:flex-row md:items-stretch gap-3 md:gap-0">
+      {/* ── Document pipeline (signature) — full ISO 19650 hierarchy ── */}
+      <div className="flex flex-col lg:flex-row lg:items-stretch gap-3 lg:gap-0">
         <DocNode kind="OIR" projectId={project.id} docs={oirs} />
+        <Connector />
+        <DocNode kind="PIR" projectId={project.id} docs={pirs} />
+        <Connector />
+        <DocNode kind="AIR" projectId={project.id} docs={airs} />
         <Connector />
         <DocNode kind="EIR" projectId={project.id} docs={eirs} />
         <Connector />
@@ -202,7 +221,7 @@ function ProjectDossier({ index, project, oirs, eirs, beps }: {
 
 function Connector() {
   return (
-    <div className="hidden md:flex items-center px-3 self-center" aria-hidden>
+    <div className="hidden lg:flex items-center px-2 self-center" aria-hidden>
       <span className="bp-connector" />
       <svg className="w-3 h-3 text-[#8FA88E]/45 -ml-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
