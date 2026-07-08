@@ -11,8 +11,10 @@ export interface AuthRequest extends Request {
 }
 
 export function requireAuth(req: AuthRequest, res: Response, next: NextFunction) {
-  // Allow internal calls from the Next.js frontend (same server, trusted header)
-  if (req.headers['x-internal-call'] === 'true') {
+  // Internal calls from the Next.js frontend authenticate with a shared secret.
+  // INTERNAL_API_SECRET must be set to the same value in backend and frontend.
+  const internalSecret = process.env.INTERNAL_API_SECRET;
+  if (internalSecret && req.headers['x-internal-secret'] === internalSecret) {
     req.user = { id: 'internal', email: 'internal', role: 'adjudicador', organizationId: 'internal' };
     return next();
   }

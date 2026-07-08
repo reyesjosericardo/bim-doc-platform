@@ -180,7 +180,7 @@ export async function enrichEirWithLLM(vars: EIRTemplateVars): Promise<EIREnrich
   console.log('[LLM] Calling Anthropic API (13 EIR narratives)...');
   try {
     const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001',
       max_tokens: 6144,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: buildUserPrompt(vars) }],

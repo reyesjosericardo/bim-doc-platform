@@ -12,7 +12,7 @@ export async function GET(
   const backendUrl = process.env.BACKEND_URL || 'http://localhost:4000';
   const res = await fetch(
     `${backendUrl}/api/documents/eir/${params.id}/download/${params.format}`,
-    { headers: { 'x-internal-call': 'true' } }
+    { headers: { 'x-internal-secret': process.env.INTERNAL_API_SECRET ?? '' } }
   );
 
   if (!res.ok) return NextResponse.json({ error: 'File not found' }, { status: 404 });

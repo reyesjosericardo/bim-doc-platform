@@ -168,7 +168,7 @@ export async function enrichBepWithLLM(vars: BEPTemplateVars): Promise<BEPEnrich
   console.log('[LLM] Calling Anthropic API (9 BEP narratives)...');
   try {
     const response = await client.messages.create({
-      model: 'claude-haiku-4-5-20251001',
+      model: process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001',
       max_tokens: 6144,
       system: SYSTEM_PROMPT,
       messages: [{ role: 'user', content: buildUserPrompt(vars) }],

@@ -2,12 +2,24 @@ import { Router, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import fs from 'fs';
-import path from 'path';
 import { requireAuth, AuthRequest } from '../middleware/auth';
-import { generateOirDocuments, getGeneratedFilePath, generateEirDocuments, getEirGeneratedFilePath, generateBepDocuments, getBepGeneratedFilePath, generateAirDocuments, getAirGeneratedFilePath, generatePirDocuments, getPirGeneratedFilePath } from '../services/documentGenerator';
+import {
+  generateOirDocuments,
+  getGeneratedFilePath,
+  generateEirDocuments,
+  getEirGeneratedFilePath,
+  generateBepDocuments,
+  getBepGeneratedFilePath,
+  generateAirDocuments,
+  getAirGeneratedFilePath,
+  generatePirDocuments,
+  getPirGeneratedFilePath,
+} from '../services/documentGenerator';
 
 const router = Router();
 const prisma = new PrismaClient();
+
+// ─── Shared schemas ───────────────────────────────────────────────────────────
 
 const answerSchema = z.object({
   question_id: z.string(),
@@ -15,7 +27,7 @@ const answerSchema = z.object({
   answer_type: z.enum(['text', 'textarea', 'select', 'multi_select', 'boolean']),
 });
 
-const createOirSchema = z.object({
+const createDocumentSchema = z.object({
   project_id: z.string(),
   answers: z.array(answerSchema),
 });
@@ -24,296 +36,305 @@ const updateAnswersSchema = z.object({
   answers: z.array(answerSchema),
 });
 
-// POST /api/documents/oir — create OIR and save answers
-router.post('/oir', requireAuth, async (req: AuthRequest, res: Response) => {
-  const parsed = createOirSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
-  }
+const statusSchema = z.object({
+  status: z.enum(['borrador', 'en_revision', 'aprobado']),
+});
 
-  const { project_id, answers } = parsed.data;
-  const userId = req.user!.id;
+const MIME_TYPES: Record<string, string> = {
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  pdf: 'application/pdf',
+};
 
-  try {
-    const document = await prisma.bimDocument.create({
-      data: {
-        project_id,
-        document_type: 'OIR',
-        status: 'borrador',
-        version: 1,
-        created_by: userId,
-        questionnaire_answers: {
-          createMany: {
-            data: answers.map((a) => ({
+// ─── Document type configuration ──────────────────────────────────────────────
+
+type DocumentType = 'OIR' | 'EIR' | 'BEP' | 'AIR' | 'PIR';
+
+interface DocTypeConfig {
+  /** Prisma document_type value, e.g. 'OIR' */
+  type: DocumentType;
+  /** URL segment, e.g. 'oir' */
+  slug: string;
+  /** Total questions in the questionnaire (for progress %) */
+  totalQuestions: number;
+  /** Allowed values for the :format download param */
+  downloadFormats: string[];
+  /** Runs Word + PDF generation; returns the JSON payload for the response */
+  generate: (id: string, body: unknown) => Promise<Record<string, unknown>>;
+  /** Resolves the on-disk path of a generated file */
+  getFilePath: (id: string, version: number, format: string) => string;
+  /** Filename offered to the browser on download */
+  downloadFilename: (version: number, format: string) => string;
+}
+
+const DOC_TYPES: DocTypeConfig[] = [
+  {
+    type: 'OIR',
+    slug: 'oir',
+    totalQuestions: 27,
+    downloadFormats: ['docx', 'pdf', 'docx_exec', 'pdf_exec'],
+    generate: async (id, body) => {
+      const mode: 'complete' | 'narrative_only' =
+        (body as { mode?: string } | undefined)?.mode === 'narrative_only' ? 'narrative_only' : 'complete';
+      const files = await generateOirDocuments(id, mode);
+      return { message: 'Documents generated successfully', mode, docxUrl: files.docxUrl, pdfUrl: files.pdfUrl };
+    },
+    getFilePath: (id, version, format) =>
+      getGeneratedFilePath(id, version, format as 'docx' | 'pdf' | 'docx_exec' | 'pdf_exec'),
+    downloadFilename: (version, format) => {
+      const ext = format.startsWith('docx') ? 'docx' : 'pdf';
+      const suffix = format.endsWith('_exec') ? '_ejecutivo' : '';
+      return `OIR_v${version}${suffix}.${ext}`;
+    },
+  },
+  {
+    type: 'EIR',
+    slug: 'eir',
+    totalQuestions: 32,
+    downloadFormats: ['docx', 'pdf'],
+    generate: async (id) => {
+      const files = await generateEirDocuments(id);
+      return { message: 'EIR documents generated successfully', docxUrl: files.docxUrl, pdfUrl: files.pdfUrl };
+    },
+    getFilePath: (id, version, format) => getEirGeneratedFilePath(id, version, format as 'docx' | 'pdf'),
+    downloadFilename: (version, format) => `EIR_v${version}.${format}`,
+  },
+  {
+    type: 'BEP',
+    slug: 'bep',
+    totalQuestions: 36,
+    downloadFormats: ['docx', 'pdf'],
+    generate: async (id) => {
+      const files = await generateBepDocuments(id);
+      return { message: 'BEP documents generated successfully', docxUrl: files.docxUrl, pdfUrl: files.pdfUrl };
+    },
+    getFilePath: (id, version, format) => getBepGeneratedFilePath(id, version, format as 'docx' | 'pdf'),
+    downloadFilename: (version, format) => `BEP_v${version}.${format}`,
+  },
+  {
+    type: 'AIR',
+    slug: 'air',
+    totalQuestions: 29,
+    downloadFormats: ['docx', 'pdf'],
+    generate: async (id) => {
+      const files = await generateAirDocuments(id);
+      return { message: 'AIR documents generated successfully', docxUrl: files.docxUrl, pdfUrl: files.pdfUrl };
+    },
+    getFilePath: (id, version, format) => getAirGeneratedFilePath(id, version, format as 'docx' | 'pdf'),
+    downloadFilename: (version, format) => `AIR_v${version}.${format}`,
+  },
+  {
+    type: 'PIR',
+    slug: 'pir',
+    totalQuestions: 24,
+    downloadFormats: ['docx', 'pdf'],
+    generate: async (id) => {
+      const files = await generatePirDocuments(id);
+      return { message: 'PIR documents generated successfully', docxUrl: files.docxUrl, pdfUrl: files.pdfUrl };
+    },
+    getFilePath: (id, version, format) => getPirGeneratedFilePath(id, version, format as 'docx' | 'pdf'),
+    downloadFilename: (version, format) => `PIR_v${version}.${format}`,
+  },
+];
+
+// ─── Generic CRUD + generation routes per document type ───────────────────────
+
+function registerDocumentRoutes(cfg: DocTypeConfig) {
+  const { type, slug } = cfg;
+
+  // POST /api/documents/:slug — create document with initial answers
+  router.post(`/${slug}`, requireAuth, async (req: AuthRequest, res: Response) => {
+    const parsed = createDocumentSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
+    }
+    const { project_id, answers } = parsed.data;
+    try {
+      const document = await prisma.bimDocument.create({
+        data: {
+          project_id,
+          document_type: type,
+          status: 'borrador',
+          version: 1,
+          created_by: req.user!.id,
+          questionnaire_answers: {
+            createMany: {
+              data: answers.map((a) => ({
+                question_id: a.question_id,
+                answer_value: a.answer_value,
+                answer_type: a.answer_type,
+              })),
+              skipDuplicates: true,
+            },
+          },
+        },
+        include: { questionnaire_answers: true },
+      });
+      return res.status(201).json(document);
+    } catch (error) {
+      console.error(`Error creating ${type}:`, error);
+      return res.status(500).json({ error: `Failed to create ${type} document` });
+    }
+  });
+
+  // GET /api/documents/:slug/:id — retrieve document with all answers
+  router.get(`/${slug}/:id`, requireAuth, async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    try {
+      const document = await prisma.bimDocument.findUnique({
+        where: { id, document_type: type },
+        include: {
+          questionnaire_answers: { orderBy: { question_id: 'asc' } },
+          project: { select: { id: true, name: true, organization_id: true } },
+          creator: { select: { id: true, email: true, role: true } },
+          approver: { select: { id: true, email: true, role: true } },
+        },
+      });
+      if (!document) return res.status(404).json({ error: `${type} document not found` });
+      return res.json(document);
+    } catch (error) {
+      console.error(`Error fetching ${type}:`, error);
+      return res.status(500).json({ error: `Failed to fetch ${type} document` });
+    }
+  });
+
+  // PATCH /api/documents/:slug/:id — upsert answers (autosave)
+  router.patch(`/${slug}/:id`, requireAuth, async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const parsed = updateAnswersSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
+    }
+    const { answers } = parsed.data;
+    try {
+      const document = await prisma.bimDocument.findUnique({ where: { id, document_type: type } });
+      if (!document) return res.status(404).json({ error: `${type} document not found` });
+
+      await Promise.all(
+        answers.map((a) =>
+          prisma.questionnaireAnswer.upsert({
+            where: { document_id_question_id: { document_id: id, question_id: a.question_id } },
+            update: { answer_value: a.answer_value, answer_type: a.answer_type },
+            create: {
+              document_id: id,
               question_id: a.question_id,
               answer_value: a.answer_value,
               answer_type: a.answer_type,
-            })),
-            skipDuplicates: true,
-          },
-        },
-      },
-      include: {
-        questionnaire_answers: true,
-      },
-    });
-
-    return res.status(201).json(document);
-  } catch (error) {
-    console.error('Error creating OIR:', error);
-    return res.status(500).json({ error: 'Failed to create OIR document' });
-  }
-});
-
-// GET /api/documents/oir/:id — retrieve OIR with all answers
-router.get('/oir/:id', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-
-  try {
-    const document = await prisma.bimDocument.findUnique({
-      where: { id, document_type: 'OIR' },
-      include: {
-        questionnaire_answers: {
-          orderBy: { question_id: 'asc' },
-        },
-        project: {
-          select: { id: true, name: true, organization_id: true },
-        },
-        creator: {
-          select: { id: true, email: true, role: true },
-        },
-        approver: {
-          select: { id: true, email: true, role: true },
-        },
-      },
-    });
-
-    if (!document) {
-      return res.status(404).json({ error: 'OIR document not found' });
-    }
-
-    return res.json(document);
-  } catch (error) {
-    console.error('Error fetching OIR:', error);
-    return res.status(500).json({ error: 'Failed to fetch OIR document' });
-  }
-});
-
-// PATCH /api/documents/oir/:id — upsert answers (autosave)
-router.patch('/oir/:id', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const parsed = updateAnswersSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
-  }
-
-  const { answers } = parsed.data;
-
-  try {
-    const document = await prisma.bimDocument.findUnique({
-      where: { id, document_type: 'OIR' },
-    });
-
-    if (!document) {
-      return res.status(404).json({ error: 'OIR document not found' });
-    }
-
-    // Upsert each answer (insert or update on conflict)
-    await Promise.all(
-      answers.map((a) =>
-        prisma.questionnaireAnswer.upsert({
-          where: {
-            document_id_question_id: {
-              document_id: id,
-              question_id: a.question_id,
             },
-          },
-          update: {
-            answer_value: a.answer_value,
-            answer_type: a.answer_type,
-          },
-          create: {
-            document_id: id,
-            question_id: a.question_id,
-            answer_value: a.answer_value,
-            answer_type: a.answer_type,
-          },
-        })
-      )
-    );
+          })
+        )
+      );
 
-    // Touch updated_at on the document
-    await prisma.bimDocument.update({
-      where: { id },
-      data: { updated_at: new Date() },
-    });
+      await prisma.bimDocument.update({ where: { id }, data: { updated_at: new Date() } });
 
-    const updated = await prisma.bimDocument.findUnique({
-      where: { id },
-      include: { questionnaire_answers: { orderBy: { question_id: 'asc' } } },
-    });
-
-    return res.json(updated);
-  } catch (error) {
-    console.error('Error updating OIR answers:', error);
-    return res.status(500).json({ error: 'Failed to update OIR answers' });
-  }
-});
-
-// PATCH /api/documents/oir/:id/status — change document status
-router.patch('/oir/:id/status', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const statusSchema = z.object({
-    status: z.enum(['borrador', 'en_revision', 'aprobado']),
+      const updated = await prisma.bimDocument.findUnique({
+        where: { id },
+        include: { questionnaire_answers: { orderBy: { question_id: 'asc' } } },
+      });
+      return res.json(updated);
+    } catch (error) {
+      console.error(`Error updating ${type} answers:`, error);
+      return res.status(500).json({ error: `Failed to update ${type} answers` });
+    }
   });
 
-  const parsed = statusSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid status value' });
-  }
+  // PATCH /api/documents/:slug/:id/status — change document status
+  router.patch(`/${slug}/:id/status`, requireAuth, async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    const parsed = statusSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Invalid status value' });
+    try {
+      const document = await prisma.bimDocument.findUnique({ where: { id, document_type: type } });
+      if (!document) return res.status(404).json({ error: `${type} document not found` });
 
-  try {
-    const document = await prisma.bimDocument.findUnique({
-      where: { id, document_type: 'OIR' },
-    });
-
-    if (!document) {
-      return res.status(404).json({ error: 'OIR document not found' });
-    }
-
-    // Only adjudicador and adj_principal can approve
-    if (parsed.data.status === 'aprobado') {
-      if (!['adjudicador', 'adj_principal'].includes(req.user!.role)) {
+      if (parsed.data.status === 'aprobado' && !['adjudicador', 'adj_principal'].includes(req.user!.role)) {
         return res.status(403).json({ error: 'Only adjudicador or adj_principal can approve documents' });
       }
-    }
 
-    const updated = await prisma.bimDocument.update({
-      where: { id },
-      data: {
-        status: parsed.data.status,
-        approved_by: parsed.data.status === 'aprobado' ? req.user!.id : undefined,
-      },
-    });
-
-    return res.json(updated);
-  } catch (error) {
-    console.error('Error updating OIR status:', error);
-    return res.status(500).json({ error: 'Failed to update OIR status' });
-  }
-});
-
-// GET /api/documents/projects/:projectId/oir — list OIRs for a project
-router.get('/projects/:projectId/oir', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { projectId } = req.params;
-
-  try {
-    const documents = await prisma.bimDocument.findMany({
-      where: { project_id: projectId, document_type: 'OIR' },
-      include: {
-        questionnaire_answers: { select: { question_id: true } },
-        creator: { select: { email: true, role: true } },
-      },
-      orderBy: { created_at: 'desc' },
-    });
-
-    const withProgress = documents.map((doc) => ({
-      ...doc,
-      answered_count: doc.questionnaire_answers.length,
-      total_questions: 27,
-      progress_pct: Math.round((doc.questionnaire_answers.length / 27) * 100),
-    }));
-
-    return res.json(withProgress);
-  } catch (error) {
-    console.error('Error listing OIRs:', error);
-    return res.status(500).json({ error: 'Failed to list OIR documents' });
-  }
-});
-
-// POST /api/documents/oir/:id/generate — generate Word + PDF
-// Body: { mode?: 'complete' | 'narrative_only' }
-router.post('/oir/:id/generate', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const mode: 'complete' | 'narrative_only' =
-    req.body?.mode === 'narrative_only' ? 'narrative_only' : 'complete';
-
-  try {
-    const document = await prisma.bimDocument.findUnique({
-      where: { id, document_type: 'OIR' },
-    });
-
-    if (!document) {
-      return res.status(404).json({ error: 'OIR document not found' });
-    }
-
-    const files = await generateOirDocuments(id, mode);
-
-    return res.json({
-      message: 'Documents generated successfully',
-      mode,
-      docxUrl: files.docxUrl,
-      pdfUrl:  files.pdfUrl,
-    });
-  } catch (error) {
-    console.error('Error generating OIR documents:', error);
-    return res.status(500).json({ error: 'Failed to generate documents', detail: String(error) });
-  }
-});
-
-// GET /api/documents/oir/:id/download/:format — download docx, pdf, docx_exec, or pdf_exec
-router.get('/oir/:id/download/:format', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id, format } = req.params;
-
-  if (!['docx', 'pdf', 'docx_exec', 'pdf_exec'].includes(format)) {
-    return res.status(400).json({ error: 'Format must be docx, pdf, docx_exec, or pdf_exec' });
-  }
-
-  try {
-    const document = await prisma.bimDocument.findUnique({
-      where: { id, document_type: 'OIR' },
-    });
-
-    if (!document) {
-      return res.status(404).json({ error: 'OIR document not found' });
-    }
-
-    const filePath = getGeneratedFilePath(
-      id,
-      document.version,
-      format as 'docx' | 'pdf' | 'docx_exec' | 'pdf_exec',
-    );
-
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        error: 'File not generated yet. Call POST /generate first.',
+      const updated = await prisma.bimDocument.update({
+        where: { id },
+        data: {
+          status: parsed.data.status,
+          approved_by: parsed.data.status === 'aprobado' ? req.user!.id : undefined,
+        },
       });
+      return res.json(updated);
+    } catch (error) {
+      console.error(`Error updating ${type} status:`, error);
+      return res.status(500).json({ error: `Failed to update ${type} status` });
     }
+  });
 
-    const mimeTypes: Record<string, string> = {
-      docx:      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      pdf:       'application/pdf',
-      docx_exec: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      pdf_exec:  'application/pdf',
-    };
+  // GET /api/documents/projects/:projectId/:slug — list documents for a project
+  router.get(`/projects/:projectId/${slug}`, requireAuth, async (req: AuthRequest, res: Response) => {
+    const { projectId } = req.params;
+    try {
+      const documents = await prisma.bimDocument.findMany({
+        where: { project_id: projectId, document_type: type },
+        include: {
+          questionnaire_answers: { select: { question_id: true } },
+          creator: { select: { email: true, role: true } },
+        },
+        orderBy: { created_at: 'desc' },
+      });
+      const withProgress = documents.map((doc) => ({
+        ...doc,
+        answered_count: doc.questionnaire_answers.length,
+        total_questions: cfg.totalQuestions,
+        progress_pct: Math.round((doc.questionnaire_answers.length / cfg.totalQuestions) * 100),
+      }));
+      return res.json(withProgress);
+    } catch (error) {
+      console.error(`Error listing ${type}s:`, error);
+      return res.status(500).json({ error: `Failed to list ${type} documents` });
+    }
+  });
 
-    const ext      = format.startsWith('docx') ? 'docx' : 'pdf';
-    const suffix   = format.endsWith('_exec') ? '_ejecutivo' : '';
-    const filename = `OIR_v${document.version}${suffix}.${ext}`;
+  // POST /api/documents/:slug/:id/generate — generate Word + PDF
+  router.post(`/${slug}/:id/generate`, requireAuth, async (req: AuthRequest, res: Response) => {
+    const { id } = req.params;
+    try {
+      const document = await prisma.bimDocument.findUnique({ where: { id, document_type: type } });
+      if (!document) return res.status(404).json({ error: `${type} document not found` });
+      const payload = await cfg.generate(id, req.body);
+      return res.json(payload);
+    } catch (error) {
+      console.error(`Error generating ${type} documents:`, error);
+      return res.status(500).json({ error: `Failed to generate ${type} documents`, detail: String(error) });
+    }
+  });
 
-    res.setHeader('Content-Type', mimeTypes[format]);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+  // GET /api/documents/:slug/:id/download/:format — download a generated file
+  router.get(`/${slug}/:id/download/:format`, requireAuth, async (req: AuthRequest, res: Response) => {
+    const { id, format } = req.params;
+    if (!cfg.downloadFormats.includes(format)) {
+      return res.status(400).json({ error: `Format must be one of: ${cfg.downloadFormats.join(', ')}` });
+    }
+    try {
+      const document = await prisma.bimDocument.findUnique({ where: { id, document_type: type } });
+      if (!document) return res.status(404).json({ error: `${type} document not found` });
 
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
-    return;
-  } catch (error) {
-    console.error('Error downloading file:', error);
-    return res.status(500).json({ error: 'Failed to download file' });
-  }
-});
+      const filePath = cfg.getFilePath(id, document.version, format);
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ error: 'File not generated yet. Call POST /generate first.' });
+      }
 
-// ─── OIR Narratives ───────────────────────────────────────────────────────────
+      const ext = format.startsWith('docx') ? 'docx' : 'pdf';
+      res.setHeader('Content-Type', MIME_TYPES[ext]);
+      res.setHeader('Content-Disposition', `attachment; filename="${cfg.downloadFilename(document.version, format)}"`);
+      fs.createReadStream(filePath).pipe(res);
+      return;
+    } catch (error) {
+      console.error(`Error downloading ${type} file:`, error);
+      return res.status(500).json({ error: 'Failed to download file' });
+    }
+  });
+}
+
+DOC_TYPES.forEach(registerDocumentRoutes);
+
+// ─── OIR Narratives (OIR-only feature) ────────────────────────────────────────
+
+const narrativesSchema = z.record(z.string());
 
 // POST /api/documents/oir/:id/narratives/generate — call LLM and save narratives
 router.post('/oir/:id/narratives/generate', requireAuth, async (req: AuthRequest, res: Response) => {
@@ -350,14 +371,10 @@ router.post('/oir/:id/narratives/generate', requireAuth, async (req: AuthRequest
       's7_observaciones',
     ] as const;
 
-    const narratives: Record<string, string> = {};
-    for (const key of narrativeKeys) {
-      narratives[key] = enriched[key] ?? '';
-    }
-
     // Wrap each narrative as HTML paragraph for the rich text editor
     const narrativesHtml: Record<string, string> = {};
-    for (const [key, val] of Object.entries(narratives)) {
+    for (const key of narrativeKeys) {
+      const val = enriched[key] ?? '';
       narrativesHtml[key] = val ? `<p>${val}</p>` : '<p></p>';
     }
 
@@ -391,694 +408,23 @@ router.get('/oir/:id/narratives', requireAuth, async (req: AuthRequest, res: Res
 // PATCH /api/documents/oir/:id/narratives — save edited narratives
 router.patch('/oir/:id/narratives', requireAuth, async (req: AuthRequest, res: Response) => {
   const { id } = req.params;
-  const { narratives } = req.body;
-  if (!narratives || typeof narratives !== 'object') {
-    return res.status(400).json({ error: 'narratives must be an object' });
+  const parsed = narrativesSchema.safeParse(req.body?.narratives);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'narratives must be an object of strings' });
   }
   try {
+    const document = await prisma.bimDocument.findUnique({
+      where: { id, document_type: 'OIR' },
+      select: { id: true },
+    });
+    if (!document) return res.status(404).json({ error: 'OIR document not found' });
     await prisma.bimDocument.update({
       where: { id },
-      data: { narratives },
+      data: { narratives: parsed.data },
     });
     return res.json({ ok: true });
   } catch (error) {
     return res.status(500).json({ error: 'Failed to save narratives' });
-  }
-});
-
-// ─── EIR Routes ───────────────────────────────────────────────────────────────
-
-const createEirSchema = z.object({
-  project_id: z.string(),
-  answers: z.array(answerSchema),
-});
-
-// POST /api/documents/eir
-router.post('/eir', requireAuth, async (req: AuthRequest, res: Response) => {
-  const parsed = createEirSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
-  }
-  const { project_id, answers } = parsed.data;
-  const userId = req.user!.id;
-  try {
-    const document = await prisma.bimDocument.create({
-      data: {
-        project_id,
-        document_type: 'EIR',
-        status: 'borrador',
-        version: 1,
-        created_by: userId,
-        questionnaire_answers: {
-          createMany: {
-            data: answers.map((a) => ({
-              question_id: a.question_id,
-              answer_value: a.answer_value,
-              answer_type: a.answer_type,
-            })),
-            skipDuplicates: true,
-          },
-        },
-      },
-      include: { questionnaire_answers: true },
-    });
-    return res.status(201).json(document);
-  } catch (error) {
-    console.error('Error creating EIR:', error);
-    return res.status(500).json({ error: 'Failed to create EIR document' });
-  }
-});
-
-// GET /api/documents/eir/:id
-router.get('/eir/:id', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  try {
-    const document = await prisma.bimDocument.findUnique({
-      where: { id, document_type: 'EIR' },
-      include: {
-        questionnaire_answers: { orderBy: { question_id: 'asc' } },
-        project: { select: { id: true, name: true, organization_id: true } },
-        creator: { select: { id: true, email: true, role: true } },
-        approver: { select: { id: true, email: true, role: true } },
-      },
-    });
-    if (!document) return res.status(404).json({ error: 'EIR document not found' });
-    return res.json(document);
-  } catch (error) {
-    console.error('Error fetching EIR:', error);
-    return res.status(500).json({ error: 'Failed to fetch EIR document' });
-  }
-});
-
-// PATCH /api/documents/eir/:id
-router.patch('/eir/:id', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const parsed = updateAnswersSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
-  }
-  const { answers } = parsed.data;
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'EIR' } });
-    if (!document) return res.status(404).json({ error: 'EIR document not found' });
-    await Promise.all(
-      answers.map((a) =>
-        prisma.questionnaireAnswer.upsert({
-          where: { document_id_question_id: { document_id: id, question_id: a.question_id } },
-          update: { answer_value: a.answer_value, answer_type: a.answer_type },
-          create: { document_id: id, question_id: a.question_id, answer_value: a.answer_value, answer_type: a.answer_type },
-        })
-      )
-    );
-    await prisma.bimDocument.update({ where: { id }, data: { updated_at: new Date() } });
-    const updated = await prisma.bimDocument.findUnique({
-      where: { id },
-      include: { questionnaire_answers: { orderBy: { question_id: 'asc' } } },
-    });
-    return res.json(updated);
-  } catch (error) {
-    console.error('Error updating EIR answers:', error);
-    return res.status(500).json({ error: 'Failed to update EIR answers' });
-  }
-});
-
-// PATCH /api/documents/eir/:id/status
-router.patch('/eir/:id/status', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const statusSchema = z.object({ status: z.enum(['borrador', 'en_revision', 'aprobado']) });
-  const parsed = statusSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'Invalid status value' });
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'EIR' } });
-    if (!document) return res.status(404).json({ error: 'EIR document not found' });
-    if (parsed.data.status === 'aprobado') {
-      if (!['adjudicador', 'adj_principal'].includes(req.user!.role)) {
-        return res.status(403).json({ error: 'Only adjudicador or adj_principal can approve documents' });
-      }
-    }
-    const updated = await prisma.bimDocument.update({
-      where: { id },
-      data: { status: parsed.data.status, approved_by: parsed.data.status === 'aprobado' ? req.user!.id : undefined },
-    });
-    return res.json(updated);
-  } catch (error) {
-    console.error('Error updating EIR status:', error);
-    return res.status(500).json({ error: 'Failed to update EIR status' });
-  }
-});
-
-// GET /api/documents/projects/:projectId/eir
-router.get('/projects/:projectId/eir', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { projectId } = req.params;
-  try {
-    const documents = await prisma.bimDocument.findMany({
-      where: { project_id: projectId, document_type: 'EIR' },
-      include: {
-        questionnaire_answers: { select: { question_id: true } },
-        creator: { select: { email: true, role: true } },
-      },
-      orderBy: { created_at: 'desc' },
-    });
-    const TOTAL_EIR = 32;
-    const withProgress = documents.map((doc) => ({
-      ...doc,
-      answered_count: doc.questionnaire_answers.length,
-      total_questions: TOTAL_EIR,
-      progress_pct: Math.round((doc.questionnaire_answers.length / TOTAL_EIR) * 100),
-    }));
-    return res.json(withProgress);
-  } catch (error) {
-    console.error('Error listing EIRs:', error);
-    return res.status(500).json({ error: 'Failed to list EIR documents' });
-  }
-});
-
-// POST /api/documents/eir/:id/generate
-router.post('/eir/:id/generate', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'EIR' } });
-    if (!document) return res.status(404).json({ error: 'EIR document not found' });
-    const files = await generateEirDocuments(id);
-    return res.json({ message: 'EIR documents generated successfully', docxUrl: files.docxUrl, pdfUrl: files.pdfUrl });
-  } catch (error) {
-    console.error('Error generating EIR documents:', error);
-    return res.status(500).json({ error: 'Failed to generate EIR documents', detail: String(error) });
-  }
-});
-
-// GET /api/documents/eir/:id/download/:format
-router.get('/eir/:id/download/:format', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id, format } = req.params;
-  if (!['docx', 'pdf'].includes(format)) {
-    return res.status(400).json({ error: 'Format must be docx or pdf' });
-  }
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'EIR' } });
-    if (!document) return res.status(404).json({ error: 'EIR document not found' });
-    const filePath = getEirGeneratedFilePath(id, document.version, format as 'docx' | 'pdf');
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'File not generated yet. Call POST /generate first.' });
-    }
-    const mimeTypes: Record<string, string> = {
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      pdf:  'application/pdf',
-    };
-    const filename = `EIR_v${document.version}.${format}`;
-    res.setHeader('Content-Type', mimeTypes[format]);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
-    return;
-  } catch (error) {
-    console.error('Error downloading EIR file:', error);
-    return res.status(500).json({ error: 'Failed to download file' });
-  }
-});
-
-// ─── BEP Routes ───────────────────────────────────────────────────────────────
-
-const createBepSchema = z.object({
-  project_id: z.string(),
-  answers: z.array(answerSchema),
-});
-
-// POST /api/documents/bep
-router.post('/bep', requireAuth, async (req: AuthRequest, res: Response) => {
-  const parsed = createBepSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
-  }
-  const { project_id, answers } = parsed.data;
-  const userId = req.user!.id;
-  try {
-    const document = await prisma.bimDocument.create({
-      data: {
-        project_id,
-        document_type: 'BEP',
-        status: 'borrador',
-        version: 1,
-        created_by: userId,
-        questionnaire_answers: {
-          createMany: {
-            data: answers.map((a) => ({
-              question_id: a.question_id,
-              answer_value: a.answer_value,
-              answer_type: a.answer_type,
-            })),
-            skipDuplicates: true,
-          },
-        },
-      },
-      include: { questionnaire_answers: true },
-    });
-    return res.status(201).json(document);
-  } catch (error) {
-    console.error('Error creating BEP:', error);
-    return res.status(500).json({ error: 'Failed to create BEP document' });
-  }
-});
-
-// GET /api/documents/bep/:id
-router.get('/bep/:id', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  try {
-    const document = await prisma.bimDocument.findUnique({
-      where: { id, document_type: 'BEP' },
-      include: {
-        questionnaire_answers: { orderBy: { question_id: 'asc' } },
-        project: { select: { id: true, name: true, organization_id: true } },
-        creator: { select: { id: true, email: true, role: true } },
-        approver: { select: { id: true, email: true, role: true } },
-      },
-    });
-    if (!document) return res.status(404).json({ error: 'BEP document not found' });
-    return res.json(document);
-  } catch (error) {
-    console.error('Error fetching BEP:', error);
-    return res.status(500).json({ error: 'Failed to fetch BEP document' });
-  }
-});
-
-// PATCH /api/documents/bep/:id
-router.patch('/bep/:id', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const parsed = updateAnswersSchema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
-  }
-  const { answers } = parsed.data;
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'BEP' } });
-    if (!document) return res.status(404).json({ error: 'BEP document not found' });
-    await Promise.all(
-      answers.map((a) =>
-        prisma.questionnaireAnswer.upsert({
-          where: { document_id_question_id: { document_id: id, question_id: a.question_id } },
-          update: { answer_value: a.answer_value, answer_type: a.answer_type },
-          create: { document_id: id, question_id: a.question_id, answer_value: a.answer_value, answer_type: a.answer_type },
-        })
-      )
-    );
-    await prisma.bimDocument.update({ where: { id }, data: { updated_at: new Date() } });
-    const updated = await prisma.bimDocument.findUnique({
-      where: { id },
-      include: { questionnaire_answers: { orderBy: { question_id: 'asc' } } },
-    });
-    return res.json(updated);
-  } catch (error) {
-    console.error('Error updating BEP answers:', error);
-    return res.status(500).json({ error: 'Failed to update BEP answers' });
-  }
-});
-
-// PATCH /api/documents/bep/:id/status
-router.patch('/bep/:id/status', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const statusSchema = z.object({ status: z.enum(['borrador', 'en_revision', 'aprobado']) });
-  const parsed = statusSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'Invalid status value' });
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'BEP' } });
-    if (!document) return res.status(404).json({ error: 'BEP document not found' });
-    if (parsed.data.status === 'aprobado') {
-      if (!['adjudicador', 'adj_principal'].includes(req.user!.role)) {
-        return res.status(403).json({ error: 'Only adjudicador or adj_principal can approve documents' });
-      }
-    }
-    const updated = await prisma.bimDocument.update({
-      where: { id },
-      data: { status: parsed.data.status, approved_by: parsed.data.status === 'aprobado' ? req.user!.id : undefined },
-    });
-    return res.json(updated);
-  } catch (error) {
-    console.error('Error updating BEP status:', error);
-    return res.status(500).json({ error: 'Failed to update BEP status' });
-  }
-});
-
-// GET /api/documents/projects/:projectId/bep
-router.get('/projects/:projectId/bep', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { projectId } = req.params;
-  try {
-    const documents = await prisma.bimDocument.findMany({
-      where: { project_id: projectId, document_type: 'BEP' },
-      include: {
-        questionnaire_answers: { select: { question_id: true } },
-        creator: { select: { email: true, role: true } },
-      },
-      orderBy: { created_at: 'desc' },
-    });
-    const TOTAL_BEP = 36;
-    const withProgress = documents.map((doc) => ({
-      ...doc,
-      answered_count: doc.questionnaire_answers.length,
-      total_questions: TOTAL_BEP,
-      progress_pct: Math.round((doc.questionnaire_answers.length / TOTAL_BEP) * 100),
-    }));
-    return res.json(withProgress);
-  } catch (error) {
-    console.error('Error listing BEPs:', error);
-    return res.status(500).json({ error: 'Failed to list BEP documents' });
-  }
-});
-
-// POST /api/documents/bep/:id/generate
-router.post('/bep/:id/generate', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'BEP' } });
-    if (!document) return res.status(404).json({ error: 'BEP document not found' });
-    const files = await generateBepDocuments(id);
-    return res.json({ message: 'BEP documents generated successfully', docxUrl: files.docxUrl, pdfUrl: files.pdfUrl });
-  } catch (error) {
-    console.error('Error generating BEP documents:', error);
-    return res.status(500).json({ error: 'Failed to generate BEP documents', detail: String(error) });
-  }
-});
-
-// GET /api/documents/bep/:id/download/:format
-router.get('/bep/:id/download/:format', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id, format } = req.params;
-  if (!['docx', 'pdf'].includes(format)) {
-    return res.status(400).json({ error: 'Format must be docx or pdf' });
-  }
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'BEP' } });
-    if (!document) return res.status(404).json({ error: 'BEP document not found' });
-    const filePath = getBepGeneratedFilePath(id, document.version, format as 'docx' | 'pdf');
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({ error: 'File not generated yet. Call POST /generate first.' });
-    }
-    const mimeTypes: Record<string, string> = {
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      pdf:  'application/pdf',
-    };
-    const filename = `BEP_v${document.version}.${format}`;
-    res.setHeader('Content-Type', mimeTypes[format]);
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    const stream = fs.createReadStream(filePath);
-    stream.pipe(res);
-    return;
-  } catch (error) {
-    console.error('Error downloading BEP file:', error);
-    return res.status(500).json({ error: 'Failed to download file' });
-  }
-});
-
-// ─── AIR Routes ───────────────────────────────────────────────────────────────
-
-const createAirSchema = z.object({ project_id: z.string(), answers: z.array(answerSchema) });
-
-router.post('/air', requireAuth, async (req: AuthRequest, res: Response) => {
-  const parsed = createAirSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
-  const { project_id, answers } = parsed.data;
-  try {
-    const document = await prisma.bimDocument.create({
-      data: {
-        project_id, document_type: 'AIR', status: 'borrador', version: 1, created_by: req.user!.id,
-        questionnaire_answers: { createMany: { data: answers.map((a) => ({ question_id: a.question_id, answer_value: a.answer_value, answer_type: a.answer_type })), skipDuplicates: true } },
-      },
-      include: { questionnaire_answers: true },
-    });
-    return res.status(201).json(document);
-  } catch (error) {
-    console.error('Error creating AIR:', error);
-    return res.status(500).json({ error: 'Failed to create AIR document' });
-  }
-});
-
-router.get('/air/:id', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  try {
-    const document = await prisma.bimDocument.findUnique({
-      where: { id, document_type: 'AIR' },
-      include: {
-        questionnaire_answers: { orderBy: { question_id: 'asc' } },
-        project: { select: { id: true, name: true, organization_id: true } },
-        creator: { select: { id: true, email: true, role: true } },
-        approver: { select: { id: true, email: true, role: true } },
-      },
-    });
-    if (!document) return res.status(404).json({ error: 'AIR document not found' });
-    return res.json(document);
-  } catch (error) {
-    console.error('Error fetching AIR:', error);
-    return res.status(500).json({ error: 'Failed to fetch AIR document' });
-  }
-});
-
-router.patch('/air/:id', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const parsed = updateAnswersSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
-  const { answers } = parsed.data;
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'AIR' } });
-    if (!document) return res.status(404).json({ error: 'AIR document not found' });
-    await Promise.all(
-      answers.map((a) =>
-        prisma.questionnaireAnswer.upsert({
-          where: { document_id_question_id: { document_id: id, question_id: a.question_id } },
-          update: { answer_value: a.answer_value, answer_type: a.answer_type },
-          create: { document_id: id, question_id: a.question_id, answer_value: a.answer_value, answer_type: a.answer_type },
-        })
-      )
-    );
-    await prisma.bimDocument.update({ where: { id }, data: { updated_at: new Date() } });
-    const updated = await prisma.bimDocument.findUnique({ where: { id }, include: { questionnaire_answers: { orderBy: { question_id: 'asc' } } } });
-    return res.json(updated);
-  } catch (error) {
-    console.error('Error updating AIR answers:', error);
-    return res.status(500).json({ error: 'Failed to update AIR answers' });
-  }
-});
-
-router.patch('/air/:id/status', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const statusSchema = z.object({ status: z.enum(['borrador', 'en_revision', 'aprobado']) });
-  const parsed = statusSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'Invalid status value' });
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'AIR' } });
-    if (!document) return res.status(404).json({ error: 'AIR document not found' });
-    if (parsed.data.status === 'aprobado' && !['adjudicador', 'adj_principal'].includes(req.user!.role)) {
-      return res.status(403).json({ error: 'Only adjudicador or adj_principal can approve documents' });
-    }
-    const updated = await prisma.bimDocument.update({
-      where: { id },
-      data: { status: parsed.data.status, approved_by: parsed.data.status === 'aprobado' ? req.user!.id : undefined },
-    });
-    return res.json(updated);
-  } catch (error) {
-    console.error('Error updating AIR status:', error);
-    return res.status(500).json({ error: 'Failed to update AIR status' });
-  }
-});
-
-router.get('/projects/:projectId/air', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { projectId } = req.params;
-  try {
-    const documents = await prisma.bimDocument.findMany({
-      where: { project_id: projectId, document_type: 'AIR' },
-      include: { questionnaire_answers: { select: { question_id: true } }, creator: { select: { email: true, role: true } } },
-      orderBy: { created_at: 'desc' },
-    });
-    const TOTAL_AIR = 29;
-    const withProgress = documents.map((doc) => ({
-      ...doc,
-      answered_count: doc.questionnaire_answers.length,
-      total_questions: TOTAL_AIR,
-      progress_pct: Math.round((doc.questionnaire_answers.length / TOTAL_AIR) * 100),
-    }));
-    return res.json(withProgress);
-  } catch (error) {
-    console.error('Error listing AIRs:', error);
-    return res.status(500).json({ error: 'Failed to list AIR documents' });
-  }
-});
-
-router.post('/air/:id/generate', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'AIR' } });
-    if (!document) return res.status(404).json({ error: 'AIR document not found' });
-    const files = await generateAirDocuments(id);
-    return res.json({ message: 'AIR documents generated successfully', docxUrl: files.docxUrl, pdfUrl: files.pdfUrl });
-  } catch (error) {
-    console.error('Error generating AIR documents:', error);
-    return res.status(500).json({ error: 'Failed to generate AIR documents', detail: String(error) });
-  }
-});
-
-router.get('/air/:id/download/:format', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id, format } = req.params;
-  if (!['docx', 'pdf'].includes(format)) return res.status(400).json({ error: 'Format must be docx or pdf' });
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'AIR' } });
-    if (!document) return res.status(404).json({ error: 'AIR document not found' });
-    const filePath = getAirGeneratedFilePath(id, document.version, format as 'docx' | 'pdf');
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not generated yet. Call POST /generate first.' });
-    const mimeTypes: Record<string, string> = {
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      pdf:  'application/pdf',
-    };
-    res.setHeader('Content-Type', mimeTypes[format]);
-    res.setHeader('Content-Disposition', `attachment; filename="AIR_v${document.version}.${format}"`);
-    fs.createReadStream(filePath).pipe(res);
-    return;
-  } catch (error) {
-    console.error('Error downloading AIR file:', error);
-    return res.status(500).json({ error: 'Failed to download file' });
-  }
-});
-
-// ─── PIR Routes ───────────────────────────────────────────────────────────────
-
-const createPirSchema = z.object({ project_id: z.string(), answers: z.array(answerSchema) });
-
-router.post('/pir', requireAuth, async (req: AuthRequest, res: Response) => {
-  const parsed = createPirSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
-  const { project_id, answers } = parsed.data;
-  try {
-    const document = await prisma.bimDocument.create({
-      data: {
-        project_id, document_type: 'PIR', status: 'borrador', version: 1, created_by: req.user!.id,
-        questionnaire_answers: { createMany: { data: answers.map((a) => ({ question_id: a.question_id, answer_value: a.answer_value, answer_type: a.answer_type })), skipDuplicates: true } },
-      },
-      include: { questionnaire_answers: true },
-    });
-    return res.status(201).json(document);
-  } catch (error) {
-    console.error('Error creating PIR:', error);
-    return res.status(500).json({ error: 'Failed to create PIR document' });
-  }
-});
-
-router.get('/pir/:id', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  try {
-    const document = await prisma.bimDocument.findUnique({
-      where: { id, document_type: 'PIR' },
-      include: {
-        questionnaire_answers: { orderBy: { question_id: 'asc' } },
-        project: { select: { id: true, name: true, organization_id: true } },
-        creator: { select: { id: true, email: true, role: true } },
-        approver: { select: { id: true, email: true, role: true } },
-      },
-    });
-    if (!document) return res.status(404).json({ error: 'PIR document not found' });
-    return res.json(document);
-  } catch (error) {
-    console.error('Error fetching PIR:', error);
-    return res.status(500).json({ error: 'Failed to fetch PIR document' });
-  }
-});
-
-router.patch('/pir/:id', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const parsed = updateAnswersSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'Invalid request body', details: parsed.error.flatten() });
-  const { answers } = parsed.data;
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'PIR' } });
-    if (!document) return res.status(404).json({ error: 'PIR document not found' });
-    await Promise.all(
-      answers.map((a) =>
-        prisma.questionnaireAnswer.upsert({
-          where: { document_id_question_id: { document_id: id, question_id: a.question_id } },
-          update: { answer_value: a.answer_value, answer_type: a.answer_type },
-          create: { document_id: id, question_id: a.question_id, answer_value: a.answer_value, answer_type: a.answer_type },
-        })
-      )
-    );
-    await prisma.bimDocument.update({ where: { id }, data: { updated_at: new Date() } });
-    const updated = await prisma.bimDocument.findUnique({ where: { id }, include: { questionnaire_answers: { orderBy: { question_id: 'asc' } } } });
-    return res.json(updated);
-  } catch (error) {
-    console.error('Error updating PIR answers:', error);
-    return res.status(500).json({ error: 'Failed to update PIR answers' });
-  }
-});
-
-router.patch('/pir/:id/status', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  const statusSchema = z.object({ status: z.enum(['borrador', 'en_revision', 'aprobado']) });
-  const parsed = statusSchema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: 'Invalid status value' });
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'PIR' } });
-    if (!document) return res.status(404).json({ error: 'PIR document not found' });
-    if (parsed.data.status === 'aprobado' && !['adjudicador', 'adj_principal'].includes(req.user!.role)) {
-      return res.status(403).json({ error: 'Only adjudicador or adj_principal can approve documents' });
-    }
-    const updated = await prisma.bimDocument.update({
-      where: { id },
-      data: { status: parsed.data.status, approved_by: parsed.data.status === 'aprobado' ? req.user!.id : undefined },
-    });
-    return res.json(updated);
-  } catch (error) {
-    console.error('Error updating PIR status:', error);
-    return res.status(500).json({ error: 'Failed to update PIR status' });
-  }
-});
-
-router.get('/projects/:projectId/pir', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { projectId } = req.params;
-  try {
-    const documents = await prisma.bimDocument.findMany({
-      where: { project_id: projectId, document_type: 'PIR' },
-      include: { questionnaire_answers: { select: { question_id: true } }, creator: { select: { email: true, role: true } } },
-      orderBy: { created_at: 'desc' },
-    });
-    const TOTAL_PIR = 24;
-    const withProgress = documents.map((doc) => ({
-      ...doc,
-      answered_count: doc.questionnaire_answers.length,
-      total_questions: TOTAL_PIR,
-      progress_pct: Math.round((doc.questionnaire_answers.length / TOTAL_PIR) * 100),
-    }));
-    return res.json(withProgress);
-  } catch (error) {
-    console.error('Error listing PIRs:', error);
-    return res.status(500).json({ error: 'Failed to list PIR documents' });
-  }
-});
-
-router.post('/pir/:id/generate', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id } = req.params;
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'PIR' } });
-    if (!document) return res.status(404).json({ error: 'PIR document not found' });
-    const files = await generatePirDocuments(id);
-    return res.json({ message: 'PIR documents generated successfully', docxUrl: files.docxUrl, pdfUrl: files.pdfUrl });
-  } catch (error) {
-    console.error('Error generating PIR documents:', error);
-    return res.status(500).json({ error: 'Failed to generate PIR documents', detail: String(error) });
-  }
-});
-
-router.get('/pir/:id/download/:format', requireAuth, async (req: AuthRequest, res: Response) => {
-  const { id, format } = req.params;
-  if (!['docx', 'pdf'].includes(format)) return res.status(400).json({ error: 'Format must be docx or pdf' });
-  try {
-    const document = await prisma.bimDocument.findUnique({ where: { id, document_type: 'PIR' } });
-    if (!document) return res.status(404).json({ error: 'PIR document not found' });
-    const filePath = getPirGeneratedFilePath(id, document.version, format as 'docx' | 'pdf');
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not generated yet. Call POST /generate first.' });
-    const mimeTypes: Record<string, string> = {
-      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      pdf:  'application/pdf',
-    };
-    res.setHeader('Content-Type', mimeTypes[format]);
-    res.setHeader('Content-Disposition', `attachment; filename="PIR_v${document.version}.${format}"`);
-    fs.createReadStream(filePath).pipe(res);
-    return;
-  } catch (error) {
-    console.error('Error downloading PIR file:', error);
-    return res.status(500).json({ error: 'Failed to download file' });
   }
 });
 

@@ -75,6 +75,13 @@ Credenciales configuradas:
 ### 3. Backend
 
 Los archivos `.env` y `node_modules` ya están configurados.
+
+> **Seguridad — `INTERNAL_API_SECRET`:** las llamadas internas del frontend (Next.js)
+> al backend Express se autentican con el header `x-internal-secret`, cuyo valor debe
+> coincidir con la variable `INTERNAL_API_SECRET` definida en **ambos** `.env`
+> (backend `.env` y frontend `.env.local`). Sin esta variable configurada en el
+> backend, las llamadas internas se rechazan (401). En Railway hay que definirla
+> en los dos servicios con el mismo valor aleatorio largo.
 La migración y el seed ya fueron ejecutados.
 
 Para arrancar:

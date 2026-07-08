@@ -63,6 +63,7 @@ model BimDocument {
   version       Int            @default(1)
   created_by    String
   approved_by   String?
+  narratives    Json?
   created_at    DateTime       @default(now())
   updated_at    DateTime       @updatedAt
 
